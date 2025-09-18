@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EyeSight</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
+    </script>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-content">
+            <div class="logo">EyeSight</div>
+            <div class="nav-buttons" id="navButtons">
+                <!-- Sera rempli dynamiquement -->
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- Page d'accueil -->
+        <div id="homePage" class="page active">
+            <div class="welcome-section">
+                <h1>Bienvenue sur EyeSight</h1>
+                <p>Votre dashboard personnel pour analyser vos performances sportives</p>
+                <button class="btn btn-primary" onclick="showLogin()">Se connecter</button>
+            </div>
+
+            <div class="update-section">
+                <h3>Mise à jour des données</h3>
+                <p>Synchronisez vos dernières activités Strava</p>
+                <button class="btn btn-secondary" onclick="updateDatabase()">Mettre à jour la base de données</button>
+                <button class="btn btn-secondary" onclick="updateStreams()">Mettre à jour les streams</button>
+                <div id="updateStatus"></div>
+            </div>
+        </div>
+
+        <!-- Page de connexion -->
+        <div id="loginPage" class="page">
+            <div class="login-container">
+                <h2>Connexion</h2>
+                <form class="login-form" onsubmit="login(event)">
+                    <div class="form-group">
+                        <label for="username">Nom d'utilisateur:</label>
+                        <input type="text" id="username" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Mot de passe:</label>
+                        <input type="password" id="password" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Se connecter</button>
+                </form>
+                <div id="loginStatus"></div>
+            </div>
+        </div>
+
+        <!-- Page dashboard -->
+        <div id="dashboardPage" class="page">
+            <h2>Dashboard</h2>
+            <div class="kpi-filter">
+                  <label for="yearFilter">Année :</label>
+                  <select id="yearFilter" onchange="loadKPIsWithFilter()">
+                      <option value="">Toutes</option>
+                      <option value="2025">2025</option>
+                      <option value="2024">2024</option>
+                      <option value="2023">2023</option>
+                      <!-- ajoute les années souhaitées -->
+                  </select>
+            </div>
+            <!-- KPIs -->
+            <div id="kpiContainer" class="kpi-grid"></div>
+            <h3>Nombre d'activités par sport</h3>
+            <div id="activityCountChartContainer" style="width: 100%; max-width: 600px; margin-top: 20px;"></div>
+
+            <h2>Dernière activité</h3>
+            <!-- Dernière activité -->
+            <div class="dashboard-grid">
+                <div class="card">
+                    <div id="lastActivityInfo">
+                        <!-- Info de l'activité sera chargée ici -->
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Trace de l'activité</h3>
+                    <div id="lastActivityMapInteractive"
+                      style="height: 300px; border-radius: 12px; overflow: hidden; margin-top: 1rem;">
+                    </div>
+                    <div id="lastActivityMapStatic"
+                        style="height: 300px; border-radius: 12px; overflow: hidden; margin-top: 1rem;">
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Profil d'élévation</h3>
+                  <div id="elevationContainer" style="margin-top: 1rem;">
+                    <canvas id="elevationChart" width="600" height="200"></canvas>
+                </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="assets/js/app.js"></script>
+</body>
+</html>

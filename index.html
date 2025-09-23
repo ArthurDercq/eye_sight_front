@@ -34,13 +34,6 @@
                 <button class="btn btn-primary" onclick="showLogin()">Se connecter</button>
             </div>
 
-            <div class="update-section">
-                <h3>Mise à jour des données</h3>
-                <p>Synchronisez vos dernières activités Strava</p>
-                <button class="btn btn-secondary" onclick="updateDatabase()">Mettre à jour la base de données</button>
-                <button class="btn btn-secondary" onclick="updateStreams()">Mettre à jour les streams</button>
-                <div id="updateStatus"></div>
-            </div>
         </div>
 
         <!-- Page de connexion -->
@@ -64,7 +57,14 @@
 
         <!-- Page dashboard -->
         <div id="dashboardPage" class="page">
-            <h2>Dashboard</h2>
+            <div class="dashboard-header">
+                <h2>Dashboard</h2>
+                <div class="update-buttons">
+                    <button class="btn btn-secondary" onclick="updateDatabase()">Mettre à jour la base de données</button>
+                    <button class="btn btn-secondary" onclick="updateStreams()">Mettre à jour les streams</button>
+                </div>
+            </div>
+            <div id="updateStatus"></div>
             <div class="kpi-filter">
                   <label for="yearFilter">Année :</label>
                   <select id="yearFilter" onchange="loadKPIsWithFilter()">
@@ -80,7 +80,20 @@
             <h3>Nombre d'activités par sport</h3>
             <div id="activityCountChartContainer" style="width: 100%; max-width: 600px; margin-top: 20px;"></div>
 
-            <h2>Dernière activité</h3>
+            <div class="last-activity-header">
+                <h2>Dernière activité</h2>
+                <div class="sport-filter">
+                    <label for="sportFilter">Sport :</label>
+                    <select id="sportFilter" onchange="loadLastActivityWithFilter()">
+                        <option value="Run">Run</option>
+                        <option value="Bike">Bike</option>
+                        <option value="Trail">Trail</option>
+                        <option value="WeightTraining">WeightTraining</option>
+                        <option value="Hike">Hike</option>
+                        <option value="Swim">Swim</option>
+                    </select>
+                </div>
+            </div>
             <!-- Dernière activité -->
             <div class="dashboard-grid">
                 <div class="card">
@@ -97,6 +110,9 @@
                     <div id="lastActivityMapStatic"
                         style="height: 300px; border-radius: 12px; overflow: hidden; margin-top: 1rem;">
                     </div>
+                    <div id="activityMap"
+                        style="height: 300px; border-radius: 12px; overflow: hidden; margin-top: 1rem; display: none;">
+                    </div>
                 </div>
 
                 <div class="card">
@@ -104,6 +120,95 @@
                   <div id="elevationContainer" style="margin-top: 1rem;">
                     <canvas id="elevationChart" width="600" height="200"></canvas>
                 </div>
+                </div>
+            </div>
+
+            <!-- Nouveaux graphiques -->
+            <div class="analytics-section">
+                <h2>Analyses hebdomadaires</h2>
+
+                <div class="analytics-grid">
+                    <!-- Heures par jour de la semaine -->
+                    <div class="card">
+                        <div class="chart-header">
+                            <h3>Heures d'activité par jour</h3>
+                            <div class="week-controls">
+                                <button onclick="changeWeekOffset(-1)">←</button>
+                                <span id="currentWeekLabel">Semaine en cours</span>
+                                <button onclick="changeWeekOffset(1)">→</button>
+                            </div>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="dailyHoursChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Heures par semaine -->
+                    <div class="card">
+                        <div class="chart-header">
+                            <h3>Heures d'activité par semaine</h3>
+                            <div class="week-nav">
+                                <button onclick="changeWeeklyView(-1)">← 1 sem.</button>
+                                <span id="weeklyRangeLabel">10 dernières semaines</span>
+                                <button onclick="changeWeeklyView(1)">1 sem. →</button>
+                            </div>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="weeklyHoursChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Kilomètres par semaine -->
+                    <div class="card">
+                        <div class="chart-header">
+                            <h3>Kilomètres par semaine</h3>
+                            <div class="distance-filter">
+                                <select id="distanceSportFilter" onchange="loadWeeklyDistance()">
+                                    <option value="Run">Run</option>
+                                    <option value="Trail">Trail</option>
+                                    <option value="Bike">Bike</option>
+                                    <option value="Swim">Swim</option>
+                                    <option value="Run,Trail">Run & Trail</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="weeklyDistanceChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Objectifs hebdomadaires -->
+                    <div class="card">
+                        <h3>Objectifs de la semaine</h3>
+                        <div class="goals-container">
+                            <div class="goal-item">
+                                <label>Objectif Run & Trail (km):</label>
+                                <input type="number" id="goalRunTrail" onchange="saveGoals()" placeholder="0">
+                                <div class="progress-bar">
+                                    <div class="progress-fill" id="progressRunTrail"></div>
+                                </div>
+                                <span id="progressRunTrailText">0/0 km</span>
+                            </div>
+
+                            <div class="goal-item">
+                                <label>Objectif Vélo (km):</label>
+                                <input type="number" id="goalBike" onchange="saveGoals()" placeholder="0">
+                                <div class="progress-bar">
+                                    <div class="progress-fill" id="progressBike"></div>
+                                </div>
+                                <span id="progressBikeText">0/0 km</span>
+                            </div>
+
+                            <div class="goal-item">
+                                <label>Objectif Natation (km):</label>
+                                <input type="number" id="goalSwim" onchange="saveGoals()" placeholder="0">
+                                <div class="progress-bar">
+                                    <div class="progress-fill" id="progressSwim"></div>
+                                </div>
+                                <span id="progressSwimText">0/0 km</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

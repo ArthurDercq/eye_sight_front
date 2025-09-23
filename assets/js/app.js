@@ -1,5 +1,5 @@
 const API_BASE = 'http://localhost:3000/api';
-let currentToken = localStorage.getItem('eyesight_token');
+let currentToken = null;
 let charts = {};
 
 // Gestion de l'état de l'application
@@ -63,8 +63,7 @@ async function login(event) {
         const data = await response.json();
 
         if (response.ok) {
-            currentToken = data.access_token;
-            localStorage.setItem('eyesight_token', currentToken);
+            setSecureToken(data.access_token);
             statusEl.innerHTML = '<div class="status-message success">Connexion réussie!</div>';
             setTimeout(() => {
                 showPage('dashboardPage');
@@ -89,10 +88,13 @@ async function updateDatabase() {
     const statusEl = document.getElementById('updateStatus');
     statusEl.innerHTML = '<div class="status-message loading">Mise à jour en cours...</div>';
 
+    const headers = getAuthHeaders();
+    if (!headers) return;
+
     try {
         const response = await fetch(`${API_BASE}/activities/update_db`, {
             method: 'POST',
-            headers: getAuthHeaders()
+            headers: headers
         });
 
         const data = await response.json();
@@ -111,10 +113,13 @@ async function updateStreams() {
     const statusEl = document.getElementById('updateStatus');
     statusEl.innerHTML = '<div class="status-message loading">Mise à jour des streams...</div>';
 
+    const headers = getAuthHeaders();
+    if (!headers) return;
+
     try {
         const response = await fetch(`${API_BASE}/activities/update_streams`, {
             method: 'POST',
-            headers: getAuthHeaders()
+            headers: headers
         });
 
         const data = await response.json();
@@ -131,18 +136,58 @@ async function updateStreams() {
 
 // Utilitaires API
 function getAuthHeaders() {
+    if (!currentToken || isTokenExpired()) {
+        return null;
+    }
     return {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${currentToken}`
     };
 }
 
+function isTokenExpired() {
+    if (!currentToken) return true;
+    try {
+        const payload = JSON.parse(atob(currentToken.split('.')[1]));
+        return payload.exp * 1000 < Date.now();
+    } catch {
+        return true;
+    }
+}
+
+function setSecureToken(token) {
+    currentToken = token;
+    localStorage.setItem('eyesight_token', token);
+}
+
+function validateToken() {
+    const token = localStorage.getItem('eyesight_token');
+    if (!token || isTokenExpired()) {
+        logout();
+        return false;
+    }
+    currentToken = token;
+    return true;
+}
+
 // Chargement du dashboard
 async function loadDashboard() {
     await loadKPIsWithFilter();
     await loadLastActivity();
-    await loadActivityElevation();
-    await displayElevationProfile();
+    await loadAnalytics();
+}
+
+// Variables globales pour les analyses
+let currentWeekOffset = 0;
+let currentWeeklyOffset = 0;
+
+// Chargement des analyses
+async function loadAnalytics() {
+    await loadDailyHours();
+    await loadWeeklyHours();
+    await loadWeeklyDistance();
+    loadGoals();
+    updateGoalsProgress();
 }
 
 async function loadKPIs() {
@@ -232,7 +277,11 @@ function displayKPIs(kpis) {
     // ==========================
     if (kpis["nombre d'activités par sport"]) {
         const chartContainer = document.getElementById('activityCountChartContainer');
-        chartContainer.innerHTML = ''; // clear
+        chartContainer.innerHTML = '';
+
+        if (charts.activityCount) {
+            charts.activityCount.destroy();
+        }
 
         const canvas = document.createElement('canvas');
         chartContainer.appendChild(canvas);
@@ -249,7 +298,7 @@ function displayKPIs(kpis) {
             }
         });
 
-        new Chart(canvas.getContext('2d'), {
+        charts.activityCount = new Chart(canvas.getContext('2d'), {
             type: 'bar',
             data: {
                 labels: labels,
@@ -261,7 +310,9 @@ function displayKPIs(kpis) {
                 }]
             },
             options: {
-                indexAxis: 'y',  // barre horizontale
+                responsive: true,
+                maintainAspectRatio: false,
+                indexAxis: 'y',
                 scales: {
                     x: {
                         beginAtZero: true,
@@ -293,167 +344,49 @@ function displayKPIs(kpis) {
 
 
 // Chargement de la dernière activité
-async function loadLastActivity() {
+async function loadLastActivity(sportType = 'Run') {
+    const headers = getAuthHeaders();
+    if (!headers) return;
+
     try {
-        const response = await fetch(`${API_BASE}/activities/last_activity`, {
-            headers: getAuthHeaders()
+        const url = `${API_BASE}/activities/last_activity?sport_type=${encodeURIComponent(sportType)}`;
+        const response = await fetch(url, {
+            headers: headers
         });
 
         if (response.ok) {
             const data = await response.json();
-            displayLastActivity(data);
-            await loadActivityTrace(data);
-            await loadActivityElevation();
+            if (data.message) {
+                displayNoActivityMessage(data.message);
+            } else {
+                displayLastActivity(data);
+                await loadActivityTrace(data);
+                await loadActivityElevation(sportType);
+            }
         }
     } catch (error) {
         console.error('Erreur chargement dernière activité:', error);
     }
 }
 
-function displayLastActivity(activity) {
+async function loadLastActivityWithFilter() {
+    const sportType = document.getElementById('sportFilter').value;
+    await loadLastActivity(sportType);
+}
+
+function displayNoActivityMessage(message) {
     const container = document.getElementById('lastActivityInfo');
-
-    // Formatage de la date
-    const date = new Date(activity.date).toLocaleDateString('fr-FR', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-    });
-
-
     container.innerHTML = `
-        <div class="activity-header">
-            <div class="activity-title">${activity.name || 'Activité'}</div>
-            <div class="activity-date">${date}</div>
-        </div>
-
-        <div class="activity-info">
-            <div class="activity-stat">
-                <div class="activity-stat-value">${activity.distance_km.toFixed(2)} km</div>
-                <div class="activity-stat-label">Distance</div>
-            </div>
-            <div class="activity-stat">
-                <div class="activity-stat-value">${activity.duree_hms}</div>
-                <div class="activity-stat-label">Durée</div>
-            </div>
-            <div class="activity-stat">
-                <div class="activity-stat-value">${Math.round(activity.denivele_m || 0)} m</div>
-                <div class="activity-stat-label">Dénivelé+</div>
-            </div>
-            <div class="activity-stat">
-                <div class="activity-stat-value">${activity.allure_min_per_km}</div>
-                <div class="activity-stat-label">Allure (min/km)</div>
-            </div>
-            <div class="activity-stat">
-                <div class="activity-stat-value">${activity.vitesse_kmh.toFixed(1)} km/h</div>
-                <div class="activity-stat-label">Vitesse moy.</div>
-            </div>
+        <div style="text-align: center; padding: 2rem; color: #666;">
+            <p>${message}</p>
         </div>
     `;
+
+    // Vider les cartes et graphiques
+    document.getElementById('lastActivityMapInteractive').innerHTML = '';
+    document.getElementById('lastActivityMapStatic').innerHTML = '';
+    clearElevationChart();
 }
-
-
-// Chargement de la trace d'activité
-async function loadActivityTrace(activity) {
-    try {
-        // Utiliser directement les coords de l'activité
-        if (activity.coords && activity.coords.length > 0) {
-            displayActivityTrace(activity.coords);
-        } else {
-            document.getElementById('activityMap').innerHTML =
-                '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #666;">Aucune donnée GPS disponible</div>';
-        }
-    } catch (error) {
-        console.error('Erreur chargement trace:', error);
-        document.getElementById('activityMap').innerHTML =
-            '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #dc3545;">Erreur chargement trace</div>';
-    }
-}
-
-function displayActivityTrace(coords) {
-    const mapContainer = document.getElementById('activityMap');
-
-    if (!coords || coords.length === 0) {
-        mapContainer.innerHTML =
-            '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #666;">Aucune coordonnée GPS disponible</div>';
-        return;
-    }
-
-    // Les coords sont déjà au format [lat, lon]
-    const validPoints = coords.filter(coord =>
-        coord[0] !== null && coord[1] !== null &&
-        !isNaN(coord[0]) && !isNaN(coord[1])
-    );
-
-    if (validPoints.length === 0) {
-        mapContainer.innerHTML =
-            '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #666;">Aucune coordonnée GPS valide</div>';
-        return;
-    }
-
-    // Calculer les limites
-    const lats = validPoints.map(p => p[0]);
-    const lons = validPoints.map(p => p[1]);
-    const minLat = Math.min(...lats);
-    const maxLat = Math.max(...lats);
-    const minLon = Math.min(...lons);
-    const maxLon = Math.max(...lons);
-
-    // Dimensions du conteneur
-    const width = 400;
-    const height = 400;
-    const padding = 20;
-
-    // Fonction de projection
-    const latRange = maxLat - minLat;
-    const lonRange = maxLon - minLon;
-
-    const scaleX = (width - 2 * padding) / (lonRange || 0.001);
-    const scaleY = (height - 2 * padding) / (latRange || 0.001);
-    const scale = Math.min(scaleX, scaleY);
-
-    const projectX = lon => padding + (lon - minLon) * scale;
-    const projectY = lat => height - padding - (lat - minLat) * scale;
-
-    // Créer le SVG avec la polyline
-    const pathPoints = validPoints.map(coord =>
-        `${projectX(coord[1])},${projectY(coord[0])}`
-    ).join(' L ');
-
-    mapContainer.innerHTML = `
-        <svg class="polyline-svg" viewBox="0 0 ${width} ${height}">
-            <rect width="100%" height="100%" fill="#f8f9fa"/>
-            <polyline
-                points="M ${pathPoints}"
-                fill="none"
-                stroke="#667eea"
-                stroke-width="3"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-            />
-            <circle
-                cx="${projectX(validPoints[0][1])}"
-                cy="${projectY(validPoints[0][0])}"
-                r="6"
-                fill="#28a745"
-                stroke="#fff"
-                stroke-width="2"
-            />
-            <circle
-                cx="${projectX(validPoints[validPoints.length - 1][1])}"
-                cy="${projectY(validPoints[validPoints.length - 1][0])}"
-                r="6"
-                fill="#dc3545"
-                stroke="#fff"
-                stroke-width="2"
-            />
-        </svg>
-    `;
-}
-
-let mapInteractive, mapStatic;
-let polylineInteractive, polylineStatic;
 
 function displayLastActivity(activity) {
     const container = document.getElementById('lastActivityInfo');
@@ -498,9 +431,11 @@ function displayLastActivity(activity) {
     const coords = activity.polyline_coords || [];
     if (coords.length === 0) return;
 
-    // ========================
-    // 🗺️ Carte interactive
-    // ========================
+    initializeInteractiveMap(coords);
+    initializeStaticMap(coords);
+}
+
+function initializeInteractiveMap(coords) {
     if (!mapInteractive) {
         mapInteractive = L.map('lastActivityMapInteractive', {
             zoomControl: true,
@@ -523,10 +458,9 @@ function displayLastActivity(activity) {
     }).addTo(mapInteractive);
 
     mapInteractive.fitBounds(polylineInteractive.getBounds(), { padding: [20, 20] });
+}
 
-    // ========================
-    // 🌈 Carte figée stylée
-    // ========================
+function initializeStaticMap(coords) {
     if (!mapStatic) {
         mapStatic = L.map('lastActivityMapStatic', {
             zoomControl: false,
@@ -538,15 +472,12 @@ function displayLastActivity(activity) {
             keyboard: false,
             tap: false
         });
-
-        }
+    }
 
     if (polylineStatic) {
         mapStatic.removeLayer(polylineStatic);
     }
 
-
-    // Trace blanche
     polylineStatic = L.polyline(coords, {
         color: '#352f99ff',
         weight: 3,
@@ -558,25 +489,158 @@ function displayLastActivity(activity) {
 }
 
 
-
-
-async function loadActivityElevation() {
+// Chargement de la trace d'activité
+async function loadActivityTrace(activity) {
     try {
-        const response = await fetch(`${API_BASE}/activities/last_activity_streams`, {
-            headers: getAuthHeaders()
+        // Utiliser directement les coords de l'activité
+        if (activity.coords && activity.coords.length > 0) {
+            displayActivityTrace(activity.coords);
+        } else {
+            document.getElementById('activityMap').innerHTML =
+                '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #666;">Aucune donnée GPS disponible</div>';
+        }
+    } catch (error) {
+        console.error('Erreur chargement trace:', error);
+        document.getElementById('activityMap').innerHTML =
+            '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #dc3545;">Erreur chargement trace</div>';
+    }
+}
+
+function displayActivityTrace(coords) {
+    const mapContainer = document.getElementById('activityMap');
+
+    if (!coords || coords.length === 0) {
+        if (mapContainer) {
+            mapContainer.innerHTML =
+                '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #666;">Aucune coordonnée GPS disponible</div>';
+        }
+        return;
+    }
+
+    // Les coords sont déjà au format [lat, lon]
+    const validPoints = coords.filter(coord =>
+        coord[0] !== null && coord[1] !== null &&
+        !isNaN(coord[0]) && !isNaN(coord[1])
+    );
+
+    if (validPoints.length === 0) {
+        if (mapContainer) {
+            mapContainer.innerHTML =
+                '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #666;">Aucune coordonnée GPS valide</div>';
+        }
+        return;
+    }
+
+    // Calculer les limites
+    const lats = validPoints.map(p => p[0]);
+    const lons = validPoints.map(p => p[1]);
+    const minLat = Math.min(...lats);
+    const maxLat = Math.max(...lats);
+    const minLon = Math.min(...lons);
+    const maxLon = Math.max(...lons);
+
+    // Dimensions du conteneur
+    const width = 400;
+    const height = 400;
+    const padding = 20;
+
+    // Fonction de projection
+    const latRange = maxLat - minLat;
+    const lonRange = maxLon - minLon;
+
+    const scaleX = (width - 2 * padding) / (lonRange || 0.001);
+    const scaleY = (height - 2 * padding) / (latRange || 0.001);
+    const scale = Math.min(scaleX, scaleY);
+
+    const projectX = lon => padding + (lon - minLon) * scale;
+    const projectY = lat => height - padding - (lat - minLat) * scale;
+
+    // Créer le SVG avec la polyline
+    const pathPoints = validPoints.map(coord =>
+        `${projectX(coord[1])},${projectY(coord[0])}`
+    ).join(' L ');
+
+    if (mapContainer) {
+        mapContainer.innerHTML = `
+            <svg class="polyline-svg" viewBox="0 0 ${width} ${height}">
+                <rect width="100%" height="100%" fill="#f8f9fa"/>
+                <polyline
+                    points="M ${pathPoints}"
+                    fill="none"
+                    stroke="#667eea"
+                    stroke-width="3"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                />
+                <circle
+                    cx="${projectX(validPoints[0][1])}"
+                    cy="${projectY(validPoints[0][0])}"
+                    r="6"
+                    fill="#28a745"
+                    stroke="#fff"
+                    stroke-width="2"
+                />
+                <circle
+                    cx="${projectX(validPoints[validPoints.length - 1][1])}"
+                    cy="${projectY(validPoints[validPoints.length - 1][0])}"
+                    r="6"
+                    fill="#dc3545"
+                    stroke="#fff"
+                    stroke-width="2"
+                />
+            </svg>
+        `;
+    }
+}
+
+let mapInteractive, mapStatic;
+let polylineInteractive, polylineStatic;
+
+
+
+
+async function loadActivityElevation(sportType = 'Run') {
+    const headers = getAuthHeaders();
+    if (!headers) return;
+
+    try {
+        const url = `${API_BASE}/activities/last_activity_streams?sport_type=${encodeURIComponent(sportType)}`;
+        const response = await fetch(url, {
+            headers: headers
         });
 
-        if (!response.ok) return;
+        if (!response.ok) {
+            console.log('Pas de données d\'élévation disponibles');
+            clearElevationChart();
+            return;
+        }
 
         const data = await response.json();
 
-        if (!data.streams || data.streams.length === 0) return;
+        if (!data.streams || data.streams.length === 0) {
+            console.log('Aucun stream d\'élévation trouvé');
+            clearElevationChart();
+            return;
+        }
 
-        // Appeler le graphique avec les streams récupérés
         displayElevationProfile(data.streams);
 
     } catch (error) {
         console.error('Erreur chargement élévation:', error);
+        clearElevationChart();
+    }
+}
+
+function clearElevationChart() {
+    const canvas = document.getElementById('elevationChart');
+    if (canvas && charts.elevation) {
+        charts.elevation.destroy();
+        charts.elevation = null;
+    }
+
+    const container = document.getElementById('elevationContainer');
+    if (container) {
+        container.innerHTML = '<p style="text-align: center; color: #666; padding: 2rem;">Aucune donnée d\'élévation disponible</p>';
     }
 }
 
@@ -585,14 +649,30 @@ async function loadActivityElevation() {
 // -----------------------------
 function displayElevationProfile(streams) {
     const canvas = document.getElementById('elevationChart');
-    if (!canvas) return;
+    if (!canvas) {
+        console.error('Canvas elevationChart non trouvé');
+        return;
+    }
+
+    if (charts.elevation) {
+        charts.elevation.destroy();
+    }
+
+    // Rétablir le canvas s'il a été supprimé
+    const container = document.getElementById('elevationContainer');
+    if (container && !container.querySelector('#elevationChart')) {
+        container.innerHTML = '<canvas id="elevationChart" width="600" height="200"></canvas>';
+        const newCanvas = document.getElementById('elevationChart');
+        if (!newCanvas) return;
+    }
 
     const ctx = canvas.getContext('2d');
+    const distances = streams.map(s => s.distance_m / 1000);
+    const elevations = streams.map(s => s.altitude);
 
-    const distances = streams.map(s => s.distance_m / 1000); // km
-    const elevations = streams.map(s => s.altitude);          // m
+    console.log('Données élévation:', { distances: distances.length, elevations: elevations.length });
 
-    new Chart(ctx, {
+    charts.elevation = new Chart(ctx, {
         type: 'line',
         data: {
             labels: distances,
@@ -608,39 +688,463 @@ function displayElevationProfile(streams) {
             }]
         },
         options: {
+            responsive: true,
+            maintainAspectRatio: false,
             scales: {
                 x: {
-                title: { display: true, text: 'Distance (km)' },
-                ticks: {
-                    callback: function(value, index) {
-                        const total = distances[distances.length - 1];       // distance totale
-                        const mid = total / 2;                               // moitié de la distance
-                        const labelValue = this.getLabelForValue(value);     // valeur réelle du tick
+                    title: { display: true, text: 'Distance (km)' },
+                    ticks: {
+                        callback: function(value) {
+                            const total = distances[distances.length - 1];
+                            if (!total) return '';
 
-                        if (labelValue === 0) return '';                     // début = vide
-                        if (Math.abs(labelValue - mid) < 1e-6) return Math.round(mid); // milieu
-                        if (Math.abs(labelValue - total) < 1e-6) return Math.round(total); // fin
-                        return '';                                           // rien pour les autres
+                            const mid = total / 2;
+                            const labelValue = this.getLabelForValue(value);
+
+                            if (labelValue === 0) return '0';
+                            if (Math.abs(labelValue - mid) < total * 0.1) return mid.toFixed(1);
+                            if (Math.abs(labelValue - total) < total * 0.1) return total.toFixed(1);
+                            return '';
+                        }
+                    }
+                },
+                y: {
+                    title: { display: true, text: 'Altitude (m)' },
+                    beginAtZero: false
+                }
+            },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `${context.parsed.y.toFixed(0)}m à ${context.parsed.x.toFixed(2)}km`;
+                        }
                     }
                 }
-            },y: { title: { display: true, text: 'Altitude (m)' } }
-            },
-            plugins: { legend: { display: false } }
+            }
         }
     });
 }
 
 
 
-// Initialisation
-document.addEventListener('DOMContentLoaded', function() {
-    updateNavigation();
+// Analyses hebdomadaires
 
-    if (currentToken) {
-        showPage('dashboardPage');
-        loadDashboard();
+// 1. Graphique des heures par jour de la semaine
+async function loadDailyHours() {
+    const headers = getAuthHeaders();
+    if (!headers) return;
+
+    try {
+        const url = `${API_BASE}/plot/daily_hours_bar?week_offset=${currentWeekOffset}`;
+        const response = await fetch(url, { headers });
+
+        if (response.ok) {
+            const data = await response.json();
+            displayDailyHours(data);
+            updateWeekLabel(data);
+        }
+    } catch (error) {
+        console.error('Erreur chargement heures quotidiennes:', error);
+    }
+}
+
+function displayDailyHours(data) {
+    const canvas = document.getElementById('dailyHoursChart');
+    if (!canvas) return;
+
+    if (charts.dailyHours) {
+        charts.dailyHours.destroy();
     }
 
+    const ctx = canvas.getContext('2d');
 
+    // Utiliser les données formatées du backend
+    const labels = data.labels || ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
 
+    // Palette de couleurs pour les différents sports
+    const sportColors = {
+        'Run': '#FF6B6B',
+        'Trail': '#4ECDC4',
+        'Bike': '#45B7D1',
+        'Swim': '#96CEB4',
+        'WeightTraining': '#FFEAA7',
+        'Hike': '#DDA0DD'
+    };
+
+    // Préparer les datasets pour chaque sport avec conversion en heures
+    const datasets = data.datasets.map(dataset => ({
+        label: dataset.label,
+        data: dataset.data.map(minutes => minutes / 60), // Convertir les minutes en heures
+        backgroundColor: sportColors[dataset.label] || '#667eea',
+        borderColor: sportColors[dataset.label] || '#667eea',
+        borderWidth: 1
+    }));
+
+    charts.dailyHours = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: datasets
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: {
+                    stacked: true
+                },
+                y: {
+                    stacked: true,
+                    title: { display: true, text: 'Heures' },
+                    beginAtZero: true,
+                    max: 8,
+                    ticks: {
+                        stepSize: 1,
+                        callback: function(value) {
+                            return value.toFixed(1) + 'h';
+                        }
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `${context.dataset.label}: ${context.parsed.y.toFixed(1)} heures`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function changeWeekOffset(delta) {
+    if (currentWeekOffset + delta >= 0) {
+        currentWeekOffset += delta;
+        loadDailyHours();
+    }
+}
+
+function updateWeekLabel(weekInfo) {
+    const label = document.getElementById('currentWeekLabel');
+    if (currentWeekOffset === 0) {
+        label.textContent = 'Semaine en cours';
+    } else {
+        label.textContent = `Il y a ${currentWeekOffset} semaine${currentWeekOffset > 1 ? 's' : ''}`;
+    }
+
+    // Afficher la semaine si disponible
+    if (weekInfo && weekInfo.week) {
+        label.textContent += ` (${weekInfo.week})`;
+    }
+}
+
+// 2. Graphique des heures par semaine avec navigation
+async function loadWeeklyHours() {
+    const headers = getAuthHeaders();
+    if (!headers) return;
+
+    try {
+        const weeks = 10 + Math.abs(currentWeeklyOffset);
+        const url = `${API_BASE}/plot/weekly_bar?value_col=moving_time&weeks=${weeks}`;
+        const response = await fetch(url, { headers });
+
+        if (response.ok) {
+            const data = await response.json();
+            displayWeeklyHours(data);
+            updateWeeklyLabel();
+        }
+    } catch (error) {
+        console.error('Erreur chargement heures hebdomadaires:', error);
+    }
+}
+
+function displayWeeklyHours(data) {
+    const canvas = document.getElementById('weeklyHoursChart');
+    if (!canvas) return;
+
+    if (charts.weeklyHours) {
+        charts.weeklyHours.destroy();
+    }
+
+    const ctx = canvas.getContext('2d');
+
+    // Prendre les 10 semaines se terminant par la semaine courante - offset
+    // Les données arrivent de la plus récente à la plus ancienne
+    const startFromEnd = currentWeeklyOffset;
+    const endFromEnd = currentWeeklyOffset + 10;
+    const weekData = data.slice(startFromEnd, endFromEnd).reverse(); // Inverser pour avoir chronologique (gauche=ancien, droite=récent)
+
+    // Créer les labels avec les dates au format DD/MM
+    const labels = weekData.map(d => {
+        const date = new Date(d.period);
+        const day = date.getDate().toString().padStart(2, '0');
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+        return `${day}/${month}`;
+    });
+
+    // Convertir moving_time (minutes) en heures
+    const hours = weekData.map(d => d.moving_time / 60);
+
+    charts.weeklyHours = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Heures',
+                data: hours,
+                backgroundColor: '#667eea',
+                borderColor: '#667eea',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    title: { display: true, text: 'Heures' },
+                    beginAtZero: true,
+                    max: 15,
+                    ticks: {
+                        stepSize: 2,
+                        callback: function(value) {
+                            return value.toFixed(1) + 'h';
+                        }
+                    }
+                }
+            },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `${context.parsed.y.toFixed(1)} heures`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Fonction utilitaire pour obtenir le numéro de semaine
+function getWeekNumber(date) {
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(),0,1));
+    return Math.ceil((((d - yearStart) / 86400000) + 1)/7);
+}
+
+function changeWeeklyView(delta) {
+    // Navigation semaine par semaine (delta de 1 ou -1)
+    currentWeeklyOffset = Math.max(0, currentWeeklyOffset + delta);
+    loadWeeklyHours();
+    loadWeeklyDistance(); // Mettre à jour aussi le graphique des distances
+}
+
+function updateWeeklyLabel() {
+    const label = document.getElementById('weeklyRangeLabel');
+    if (currentWeeklyOffset === 0) {
+        label.textContent = '10 dernières semaines (semaine courante à droite)';
+    } else if (currentWeeklyOffset === 1) {
+        label.textContent = 'Il y a 1 semaine (10 semaines au total)';
+    } else {
+        label.textContent = `Il y a ${currentWeeklyOffset} semaines (10 semaines au total)`;
+    }
+}
+
+// 3. Graphique des kilomètres par semaine avec filtre
+async function loadWeeklyDistance() {
+    const headers = getAuthHeaders();
+    if (!headers) return;
+
+    const sportFilter = document.getElementById('distanceSportFilter').value;
+    const sportTypes = sportFilter.split(',');
+
+    try {
+        const weeks = 10 + Math.abs(currentWeeklyOffset);
+        let url = `${API_BASE}/plot/weekly_bar?value_col=distance&weeks=${weeks}`;
+        if (sportTypes.length > 0) {
+            const sportParams = sportTypes.map(s => `sport_types=${encodeURIComponent(s)}`).join('&');
+            url += `&${sportParams}`;
+        }
+
+        const response = await fetch(url, { headers });
+
+        if (response.ok) {
+            const data = await response.json();
+            displayWeeklyDistance(data);
+        }
+    } catch (error) {
+        console.error('Erreur chargement distance hebdomadaire:', error);
+    }
+}
+
+function displayWeeklyDistance(data) {
+    const canvas = document.getElementById('weeklyDistanceChart');
+    if (!canvas) return;
+
+    if (charts.weeklyDistance) {
+        charts.weeklyDistance.destroy();
+    }
+
+    const ctx = canvas.getContext('2d');
+
+    // Prendre les 10 semaines se terminant par la semaine courante - offset
+    // Les données arrivent de la plus récente à la plus ancienne
+    const startFromEnd = currentWeeklyOffset;
+    const endFromEnd = currentWeeklyOffset + 10;
+    const weekData = data.slice(startFromEnd, endFromEnd).reverse(); // Inverser pour avoir chronologique (gauche=ancien, droite=récent)
+
+    // Créer les labels avec les dates au format DD/MM
+    const labels = weekData.map(d => {
+        const date = new Date(d.period);
+        const day = date.getDate().toString().padStart(2, '0');
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+        return `${day}/${month}`;
+    });
+
+    // Utiliser directement la distance (déjà en km)
+    const distances = weekData.map(d => d.distance);
+
+    charts.weeklyDistance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Distance (km)',
+                data: distances,
+                borderColor: '#764ba2',
+                backgroundColor: 'rgba(118, 75, 162, 0.1)',
+                borderWidth: 2,
+                fill: true,
+                tension: 0.3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    title: { display: true, text: 'Kilomètres' },
+                    beginAtZero: true,
+                    max: 200,
+                    ticks: {
+                        stepSize: 25,
+                        callback: function(value) {
+                            return value.toFixed(0) + ' km';
+                        }
+                    }
+                }
+            },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `${context.parsed.y.toFixed(1)} km`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// 4. Gestion des objectifs hebdomadaires
+function loadGoals() {
+    const goals = JSON.parse(localStorage.getItem('weekly_goals') || '{}');
+
+    document.getElementById('goalRunTrail').value = goals.runTrail || '';
+    document.getElementById('goalBike').value = goals.bike || '';
+    document.getElementById('goalSwim').value = goals.swim || '';
+}
+
+function saveGoals() {
+    const goals = {
+        runTrail: parseFloat(document.getElementById('goalRunTrail').value) || 0,
+        bike: parseFloat(document.getElementById('goalBike').value) || 0,
+        swim: parseFloat(document.getElementById('goalSwim').value) || 0
+    };
+
+    localStorage.setItem('weekly_goals', JSON.stringify(goals));
+    updateGoalsProgress();
+}
+
+async function updateGoalsProgress() {
+    const headers = getAuthHeaders();
+    if (!headers) return;
+
+    try {
+        // Récupérer les données de la semaine courante pour chaque sport
+        const responses = await Promise.all([
+            fetch(`${API_BASE}/plot/weekly_bar?value_col=distance&weeks=1&sport_types=Run&sport_types=Trail`, { headers }),
+            fetch(`${API_BASE}/plot/weekly_bar?value_col=distance&weeks=1&sport_types=Bike`, { headers }),
+            fetch(`${API_BASE}/plot/weekly_bar?value_col=distance&weeks=1&sport_types=Swim`, { headers })
+        ]);
+
+        const [runTrailData, bikeData, swimData] = await Promise.all(
+            responses.map(r => r.ok ? r.json() : [])
+        );
+
+        const goals = JSON.parse(localStorage.getItem('weekly_goals') || '{}');
+
+        // Calculer les progressions
+        const runTrailKm = runTrailData[0]?.distance || 0;
+        const bikeKm = bikeData[0]?.distance || 0;
+        const swimKm = swimData[0]?.distance || 0;
+
+        updateProgressBar('RunTrail', runTrailKm, goals.runTrail || 0);
+        updateProgressBar('Bike', bikeKm, goals.bike || 0);
+        updateProgressBar('Swim', swimKm, goals.swim || 0);
+
+    } catch (error) {
+        console.error('Erreur mise à jour progression:', error);
+    }
+}
+
+function updateProgressBar(sport, current, goal) {
+    const progressFill = document.getElementById(`progress${sport}`);
+    const progressText = document.getElementById(`progress${sport}Text`);
+
+    if (!progressFill || !progressText) return;
+
+    const percentage = goal > 0 ? Math.min((current / goal) * 100, 100) : 0;
+
+    progressFill.style.width = `${percentage}%`;
+    progressText.textContent = `${current.toFixed(1)}/${goal} km`;
+
+    // Changer la couleur selon la progression
+    if (percentage >= 100) {
+        progressFill.style.background = '#2ECC71'; // Vert
+    } else if (percentage >= 75) {
+        progressFill.style.background = 'linear-gradient(90deg, #667eea, #764ba2)'; // Gradient normal
+    } else if (percentage >= 50) {
+        progressFill.style.background = '#F39C12'; // Orange
+    } else {
+        progressFill.style.background = '#E74C3C'; // Rouge
+    }
+}
+
+// Initialisation
+document.addEventListener('DOMContentLoaded', function() {
+    currentToken = localStorage.getItem('eyesight_token');
+
+    if (currentToken && !isTokenExpired()) {
+        showPage('dashboardPage');
+        loadDashboard();
+    } else if (currentToken) {
+        logout();
+    }
+
+    updateNavigation();
 });

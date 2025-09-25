@@ -58,27 +58,12 @@
         <!-- Page dashboard -->
         <div id="dashboardPage" class="page">
             <div class="dashboard-header">
-                <h2>Dashboard</h2>
                 <div class="update-buttons">
                     <button class="btn btn-secondary" onclick="updateDatabase()">Mettre à jour la base de données</button>
                     <button class="btn btn-secondary" onclick="updateStreams()">Mettre à jour les streams</button>
                 </div>
             </div>
             <div id="updateStatus"></div>
-            <div class="kpi-filter">
-                  <label for="yearFilter">Année :</label>
-                  <select id="yearFilter" onchange="loadKPIsWithFilter()">
-                      <option value="">Toutes</option>
-                      <option value="2025">2025</option>
-                      <option value="2024">2024</option>
-                      <option value="2023">2023</option>
-                      <!-- ajoute les années souhaitées -->
-                  </select>
-            </div>
-            <!-- KPIs -->
-            <div id="kpiContainer" class="kpi-grid"></div>
-            <h3>Nombre d'activités par sport</h3>
-            <div id="activityCountChartContainer" style="width: 100%; max-width: 600px; margin-top: 20px;"></div>
 
             <div class="last-activity-header">
                 <h2>Dernière activité</h2>
@@ -116,10 +101,44 @@
                 </div>
 
                 <div class="card">
-                    <h3>Profil d'élévation</h3>
-                  <div id="elevationContainer" style="margin-top: 1rem;">
-                    <canvas id="elevationChart" width="600" height="200"></canvas>
+                    <h3>Objectifs de la semaine</h3>
+                    <div id="currentWeekDisplay" style="font-size: 0.8rem; color: #555; margin-bottom: 1rem;"></div>
+                    <div class="goals-container">
+                        <div class="goal-item">
+                            <label>Objectif Run & Trail (km):</label>
+                            <input type="number" id="goalRunTrail" onchange="saveGoals()" placeholder="0">
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="progressRunTrail"></div>
+                            </div>
+                            <span id="progressRunTrailText">0/0 km</span>
+                        </div>
+
+                        <div class="goal-item">
+                            <label>Objectif Vélo (km):</label>
+                            <input type="number" id="goalBike" onchange="saveGoals()" placeholder="0">
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="progressBike"></div>
+                            </div>
+                            <span id="progressBikeText">0/0 km</span>
+                        </div>
+
+                        <div class="goal-item">
+                            <label>Objectif Natation (km):</label>
+                            <input type="number" id="goalSwim" onchange="saveGoals()" placeholder="0">
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="progressSwim"></div>
+                            </div>
+                            <span id="progressSwimText">0/0 km</span>
+                        </div>
+                    </div>
                 </div>
+            </div>
+
+            <!-- Profil d'élévation sur toute la largeur -->
+            <div class="card" style="margin-top: 2rem;">
+                <h3>Profil d'élévation</h3>
+                <div id="elevationContainer" style="margin-top: 1rem;">
+                    <canvas id="elevationChart" width="600" height="200"></canvas>
                 </div>
             </div>
 
@@ -177,38 +196,27 @@
                         </div>
                     </div>
 
-                    <!-- Objectifs hebdomadaires -->
-                    <div class="card">
-                        <h3>Objectifs de la semaine</h3>
-                        <div class="goals-container">
-                            <div class="goal-item">
-                                <label>Objectif Run & Trail (km):</label>
-                                <input type="number" id="goalRunTrail" onchange="saveGoals()" placeholder="0">
-                                <div class="progress-bar">
-                                    <div class="progress-fill" id="progressRunTrail"></div>
-                                </div>
-                                <span id="progressRunTrailText">0/0 km</span>
-                            </div>
+                </div>
+            </div>
 
-                            <div class="goal-item">
-                                <label>Objectif Vélo (km):</label>
-                                <input type="number" id="goalBike" onchange="saveGoals()" placeholder="0">
-                                <div class="progress-bar">
-                                    <div class="progress-fill" id="progressBike"></div>
-                                </div>
-                                <span id="progressBikeText">0/0 km</span>
-                            </div>
+            <div class="kpi-section">
+                <div class="kpi-filter">
+                  <h2>Mes chiffres clefs</h2>
+                      <label for="yearFilter">Année :</label>
+                      <select id="yearFilter" onchange="loadKPIsWithFilter()">
+                          <option value="">Toutes</option>
+                          <option value="2025">2025</option>
+                          <option value="2024">2024</option>
+                          <option value="2023">2023</option>
+                          <!-- ajoute les années souhaitées -->
+                      </select>
+                </div>
+                <!-- KPIs -->
+                <div id="kpiContainer" class="kpi-grid"></div>
 
-                            <div class="goal-item">
-                                <label>Objectif Natation (km):</label>
-                                <input type="number" id="goalSwim" onchange="saveGoals()" placeholder="0">
-                                <div class="progress-bar">
-                                    <div class="progress-fill" id="progressSwim"></div>
-                                </div>
-                                <span id="progressSwimText">0/0 km</span>
-                            </div>
-                        </div>
-                    </div>
+                <div class="card">
+                    <h3>Nombre d'activités par sport</h3>
+                    <div id="activityCountChartContainer" style="width: 100%; margin-top: 20px;"></div>
                 </div>
             </div>
         </div>

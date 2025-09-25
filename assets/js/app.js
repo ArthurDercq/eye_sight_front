@@ -1016,6 +1016,11 @@ function displayWeeklyDistance(data) {
     // Utiliser directement la distance (déjà en km)
     const distances = weekData.map(d => d.distance);
 
+    // Calculer l'échelle dynamique
+    const maxDistance = Math.max(...distances, 0);
+    const suggestedMax = maxDistance > 0 ? Math.ceil(maxDistance * 1.1 / 25) * 25 : 50; // Arrondir au multiple de 25 supérieur avec 10% de marge
+    const stepSize = Math.max(Math.ceil(suggestedMax / 8 / 5) * 5, 5); // Environ 8 graduations, arrondies au multiple de 5
+
     charts.weeklyDistance = new Chart(ctx, {
         type: 'line',
         data: {
@@ -1037,9 +1042,9 @@ function displayWeeklyDistance(data) {
                 y: {
                     title: { display: true, text: 'Kilomètres' },
                     beginAtZero: true,
-                    max: 200,
+                    suggestedMax: suggestedMax,
                     ticks: {
-                        stepSize: 25,
+                        stepSize: stepSize,
                         callback: function(value) {
                             return value.toFixed(0) + ' km';
                         }
@@ -1067,6 +1072,35 @@ function loadGoals() {
     document.getElementById('goalRunTrail').value = goals.runTrail || '';
     document.getElementById('goalBike').value = goals.bike || '';
     document.getElementById('goalSwim').value = goals.swim || '';
+
+    // Afficher la semaine courante
+    displayCurrentWeek();
+}
+
+function displayCurrentWeek() {
+    const currentWeekDisplay = document.getElementById('currentWeekDisplay');
+    if (!currentWeekDisplay) return;
+
+    // Obtenir le lundi de la semaine courante
+    const today = new Date();
+    const dayOfWeek = today.getDay();
+    const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; // Si dimanche (0), aller à -6, sinon 1 - jour actuel
+
+    const monday = new Date(today);
+    monday.setDate(today.getDate() + diffToMonday);
+
+    // Obtenir le dimanche de la semaine courante
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+
+    // Formater les dates
+    const formatDate = (date) => {
+        const day = date.getDate().toString().padStart(2, '0');
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+        return `${day}/${month}`;
+    };
+
+    currentWeekDisplay.textContent = `semaine du ${formatDate(monday)} au ${formatDate(sunday)}`;
 }
 
 function saveGoals() {
@@ -1085,23 +1119,60 @@ async function updateGoalsProgress() {
     if (!headers) return;
 
     try {
+        // Calculer les dates de la semaine courante (lundi à dimanche)
+        const today = new Date();
+        const dayOfWeek = today.getDay();
+        const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+
+        const monday = new Date(today);
+        monday.setDate(today.getDate() + diffToMonday);
+
+        const sunday = new Date(monday);
+        sunday.setDate(monday.getDate() + 6);
+
+        // Formater les dates pour l'API (YYYY-MM-DD)
+        const formatDateForAPI = (date) => {
+            const year = date.getFullYear();
+            const month = (date.getMonth() + 1).toString().padStart(2, '0');
+            const day = date.getDate().toString().padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        };
+
+        const startDate = formatDateForAPI(monday);
+        const endDate = formatDateForAPI(sunday);
+
         // Récupérer les données de la semaine courante pour chaque sport
         const responses = await Promise.all([
-            fetch(`${API_BASE}/plot/weekly_bar?value_col=distance&weeks=1&sport_types=Run&sport_types=Trail`, { headers }),
-            fetch(`${API_BASE}/plot/weekly_bar?value_col=distance&weeks=1&sport_types=Bike`, { headers }),
-            fetch(`${API_BASE}/plot/weekly_bar?value_col=distance&weeks=1&sport_types=Swim`, { headers })
+            fetch(`${API_BASE}/activities/filter_activities?sport_type=Run&start_date=${startDate}`, { headers }),
+            fetch(`${API_BASE}/activities/filter_activities?sport_type=Trail&start_date=${startDate}`, { headers }),
+            fetch(`${API_BASE}/activities/filter_activities?sport_type=Bike&start_date=${startDate}`, { headers }),
+            fetch(`${API_BASE}/activities/filter_activities?sport_type=Swim&start_date=${startDate}`, { headers })
         ]);
 
-        const [runTrailData, bikeData, swimData] = await Promise.all(
-            responses.map(r => r.ok ? r.json() : [])
+        const [runData, trailData, bikeData, swimData] = await Promise.all(
+            responses.map(async r => r.ok ? await r.json() : { activities: [] })
         );
 
         const goals = JSON.parse(localStorage.getItem('weekly_goals') || '{}');
 
-        // Calculer les progressions
-        const runTrailKm = runTrailData[0]?.distance || 0;
-        const bikeKm = bikeData[0]?.distance || 0;
-        const swimKm = swimData[0]?.distance || 0;
+        // Filtrer les activités pour ne garder que celles de la semaine courante (entre lundi et dimanche)
+        const filterWeekActivities = (data) => {
+            if (!data.activities) return [];
+            return data.activities.filter(activity => {
+                const activityDate = new Date(activity.start_date);
+                return activityDate >= monday && activityDate <= sunday;
+            });
+        };
+
+        const runActivities = filterWeekActivities(runData);
+        const trailActivities = filterWeekActivities(trailData);
+        const bikeActivities = filterWeekActivities(bikeData);
+        const swimActivities = filterWeekActivities(swimData);
+
+        // Calculer les distances totales pour chaque sport
+        const runTrailKm = [...runActivities, ...trailActivities].reduce((total, activity) => total + (activity.distance_km || 0), 0);
+        const bikeKm = bikeActivities.reduce((total, activity) => total + (activity.distance_km || 0), 0);
+        const swimKm = swimActivities.reduce((total, activity) => total + (activity.distance_km || 0), 0);
 
         updateProgressBar('RunTrail', runTrailKm, goals.runTrail || 0);
         updateProgressBar('Bike', bikeKm, goals.bike || 0);

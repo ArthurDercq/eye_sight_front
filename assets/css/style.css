@@ -6,7 +6,7 @@
 
 body {
     font-family: 'Arial', sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, rgba(138, 154, 255, 0.7) 0%, rgba(162, 120, 235, 0.8) 50%, rgba(128, 90, 213, 0.9) 100%);
     min-height: 100vh;
     color: #333;
 }
@@ -192,22 +192,32 @@ body {
 }
 
 .kpi-card {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
+    background: white;
+    color: #333;
     padding: 1.5rem;
     border-radius: 15px;
     text-align: center;
+    border: 3px solid #667eea;
+    box-shadow: 0 4px 20px rgba(102, 126, 234, 0.15);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.kpi-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px rgba(102, 126, 234, 0.25);
 }
 
 .kpi-value {
     font-size: 2rem;
     font-weight: bold;
     margin-bottom: 0.5rem;
+    color: #667eea;
 }
 
 .kpi-label {
     font-size: 0.9rem;
-    opacity: 0.9;
+    color: #666;
+    font-weight: 500;
 }
 
 .chart-container {
@@ -441,6 +451,13 @@ body {
 
 /* Nouveaux styles pour les analyses */
 .analytics-section {
+    margin-top: 3rem;
+    padding-top: 2rem;
+    border-top: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Styles pour la section KPI */
+.kpi-section {
     margin-top: 3rem;
     padding-top: 2rem;
     border-top: 2px solid rgba(255, 255, 255, 0.2);

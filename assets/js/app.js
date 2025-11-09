@@ -187,7 +187,7 @@ async function loadAnalytics() {
     await loadWeeklyHours();
     await loadWeeklyDistance();
     loadGoals();
-    updateGoalsProgress();
+    await updateGoalsProgress();
 }
 
 async function loadKPIs() {
@@ -316,13 +316,17 @@ function displayKPIs(kpis) {
                 scales: {
                     x: {
                         beginAtZero: true,
+                        grid: { display: false },
                         ticks: {
                             callback: function(val) {
                                 return new Intl.NumberFormat('fr-FR').format(val);
                             }
                         }
                     },
-                    y: { ticks: { mirror: false } }
+                    y: {
+                        grid: { display: false },
+                        ticks: { mirror: false }
+                    }
                 },
                 plugins: {
                     legend: { display: false },
@@ -344,12 +348,16 @@ function displayKPIs(kpis) {
 
 
 // Chargement de la dernière activité
-async function loadLastActivity(sportType = 'Run') {
+async function loadLastActivity(sportType = null) {
     const headers = getAuthHeaders();
     if (!headers) return;
 
     try {
-        const url = `${API_BASE}/activities/last_activity?sport_type=${encodeURIComponent(sportType)}`;
+        // Si sportType est vide ou null, ne pas ajouter le paramètre (pour obtenir la dernière activité tous sports confondus)
+        const url = sportType
+            ? `${API_BASE}/activities/last_activity?sport_type=${encodeURIComponent(sportType)}`
+            : `${API_BASE}/activities/last_activity`;
+
         const response = await fetch(url, {
             headers: headers
         });
@@ -371,7 +379,8 @@ async function loadLastActivity(sportType = 'Run') {
 
 async function loadLastActivityWithFilter() {
     const sportType = document.getElementById('sportFilter').value;
-    await loadLastActivity(sportType);
+    // Si sportType est une chaîne vide, passer null pour obtenir la dernière activité tous sports confondus
+    await loadLastActivity(sportType || null);
 }
 
 function displayNoActivityMessage(message) {
@@ -599,12 +608,16 @@ let polylineInteractive, polylineStatic;
 
 
 
-async function loadActivityElevation(sportType = 'Run') {
+async function loadActivityElevation(sportType = null) {
     const headers = getAuthHeaders();
     if (!headers) return;
 
     try {
-        const url = `${API_BASE}/activities/last_activity_streams?sport_type=${encodeURIComponent(sportType)}`;
+        // Si sportType est vide ou null, ne pas ajouter le paramètre
+        const url = sportType
+            ? `${API_BASE}/activities/last_activity_streams?sport_type=${encodeURIComponent(sportType)}`
+            : `${API_BASE}/activities/last_activity_streams`;
+
         const response = await fetch(url, {
             headers: headers
         });
@@ -693,6 +706,7 @@ function displayElevationProfile(streams) {
             scales: {
                 x: {
                     title: { display: true, text: 'Distance (km)' },
+                    grid: { display: false },
                     ticks: {
                         callback: function(value) {
                             const total = distances[distances.length - 1];
@@ -710,6 +724,7 @@ function displayElevationProfile(streams) {
                 },
                 y: {
                     title: { display: true, text: 'Altitude (m)' },
+                    grid: { display: false },
                     beginAtZero: false
                 }
             },
@@ -793,11 +808,13 @@ function displayDailyHours(data) {
             maintainAspectRatio: false,
             scales: {
                 x: {
-                    stacked: true
+                    stacked: true,
+                    grid: { display: false }
                 },
                 y: {
                     stacked: true,
                     title: { display: true, text: 'Heures' },
+                    grid: { display: false },
                     beginAtZero: true,
                     max: 8,
                     ticks: {
@@ -835,15 +852,15 @@ function changeWeekOffset(delta) {
 function updateWeekLabel(weekInfo) {
     const label = document.getElementById('currentWeekLabel');
     if (currentWeekOffset === 0) {
-        label.textContent = 'Semaine en cours';
+        label.textContent = '';
     } else {
         label.textContent = `Il y a ${currentWeekOffset} semaine${currentWeekOffset > 1 ? 's' : ''}`;
     }
 
     // Afficher la semaine si disponible
-    if (weekInfo && weekInfo.week) {
-        label.textContent += ` (${weekInfo.week})`;
-    }
+    //if (weekInfo && weekInfo.week) {
+      //  label.textContent += ` (${weekInfo.week})`;
+    //}
 }
 
 // 2. Graphique des heures par semaine avec navigation
@@ -876,18 +893,21 @@ function displayWeeklyHours(data) {
 
     const ctx = canvas.getContext('2d');
 
-    // Prendre les 10 semaines se terminant par la semaine courante - offset
-    // Les données arrivent de la plus récente à la plus ancienne
-    const startFromEnd = currentWeeklyOffset;
-    const endFromEnd = currentWeeklyOffset + 10;
-    const weekData = data.slice(startFromEnd, endFromEnd).reverse(); // Inverser pour avoir chronologique (gauche=ancien, droite=récent)
+    // Prendre les 10 dernières semaines (les données arrivent du plus ancien au plus récent)
+    // Si offset = 0 : prendre les 10 dernières (semaine courante à droite)
+    // Si offset = 1 : sauter la dernière et prendre les 10 précédentes
+    const totalWeeks = data.length;
+    const endIndex = totalWeeks - currentWeeklyOffset;
+    const startIndex = Math.max(0, endIndex - 10);
+    const weekData = data.slice(startIndex, endIndex);
 
-    // Créer les labels avec les dates au format DD/MM
+    // Créer les labels avec les dates au format DD/MM/YYYY
     const labels = weekData.map(d => {
         const date = new Date(d.period);
         const day = date.getDate().toString().padStart(2, '0');
         const month = (date.getMonth() + 1).toString().padStart(2, '0');
-        return `${day}/${month}`;
+        const year = date.getFullYear();
+        return `${day}/${month}/${year}`;
     });
 
     // Convertir moving_time (minutes) en heures
@@ -909,8 +929,12 @@ function displayWeeklyHours(data) {
             responsive: true,
             maintainAspectRatio: false,
             scales: {
+                x: {
+                    grid: { display: false }
+                },
                 y: {
                     title: { display: true, text: 'Heures' },
+                    grid: { display: false },
                     beginAtZero: true,
                     max: 15,
                     ticks: {
@@ -954,11 +978,11 @@ function changeWeeklyView(delta) {
 function updateWeeklyLabel() {
     const label = document.getElementById('weeklyRangeLabel');
     if (currentWeeklyOffset === 0) {
-        label.textContent = '10 dernières semaines (semaine courante à droite)';
+        label.textContent = '';
     } else if (currentWeeklyOffset === 1) {
-        label.textContent = 'Il y a 1 semaine (10 semaines au total)';
+        label.textContent = 'Il y a 1 semaine';
     } else {
-        label.textContent = `Il y a ${currentWeeklyOffset} semaines (10 semaines au total)`;
+        label.textContent = `Il y a ${currentWeeklyOffset} semaines`;
     }
 }
 
@@ -999,18 +1023,37 @@ function displayWeeklyDistance(data) {
 
     const ctx = canvas.getContext('2d');
 
-    // Prendre les 10 semaines se terminant par la semaine courante - offset
-    // Les données arrivent de la plus récente à la plus ancienne
-    const startFromEnd = currentWeeklyOffset;
-    const endFromEnd = currentWeeklyOffset + 10;
-    const weekData = data.slice(startFromEnd, endFromEnd).reverse(); // Inverser pour avoir chronologique (gauche=ancien, droite=récent)
+    // Prendre les 10 dernières semaines (les données arrivent du plus ancien au plus récent)
+    // Si offset = 0 : prendre les 10 dernières (semaine courante à droite)
+    // Si offset = 1 : sauter la dernière et prendre les 10 précédentes
+    const totalWeeks = data.length;
+    const endIndex = totalWeeks - currentWeeklyOffset;
+    const startIndex = Math.max(0, endIndex - 10);
+    const weekData = data.slice(startIndex, endIndex);
 
-    // Créer les labels avec les dates au format DD/MM
+    // Mettre à jour les statistiques de la dernière semaine affichée (la plus récente)
+    if (weekData.length > 0) {
+        const lastWeek = weekData[weekData.length - 1];
+        const distance = (lastWeek.distance || 0).toFixed(1);
+        const elevation = Math.round(lastWeek.total_elevation_gain || 0);
+        const time = ((lastWeek.moving_time || 0) / 60).toFixed(1);
+
+        document.getElementById('statDistance').textContent = distance;
+        document.getElementById('statElevation').textContent = elevation;
+        document.getElementById('statTime').textContent = time;
+    } else {
+        document.getElementById('statDistance').textContent = '-';
+        document.getElementById('statElevation').textContent = '-';
+        document.getElementById('statTime').textContent = '-';
+    }
+
+    // Créer les labels avec les dates au format DD/MM/YYYY
     const labels = weekData.map(d => {
         const date = new Date(d.period);
         const day = date.getDate().toString().padStart(2, '0');
         const month = (date.getMonth() + 1).toString().padStart(2, '0');
-        return `${day}/${month}`;
+        const year = date.getFullYear();
+        return `${day}/${month}/${year}`;
     });
 
     // Utiliser directement la distance (déjà en km)
@@ -1039,8 +1082,12 @@ function displayWeeklyDistance(data) {
             responsive: true,
             maintainAspectRatio: false,
             scales: {
+                x: {
+                    grid: { display: false }
+                },
                 y: {
                     title: { display: true, text: 'Kilomètres' },
+                    grid: { display: false },
                     beginAtZero: true,
                     suggestedMax: suggestedMax,
                     ticks: {
@@ -1174,6 +1221,9 @@ async function updateGoalsProgress() {
         const bikeKm = bikeActivities.reduce((total, activity) => total + (activity.distance_km || 0), 0);
         const swimKm = swimActivities.reduce((total, activity) => total + (activity.distance_km || 0), 0);
 
+        console.log('Distances calculées:', { runTrailKm, bikeKm, swimKm });
+        console.log('Objectifs:', goals);
+
         updateProgressBar('RunTrail', runTrailKm, goals.runTrail || 0);
         updateProgressBar('Bike', bikeKm, goals.bike || 0);
         updateProgressBar('Swim', swimKm, goals.swim || 0);
@@ -1187,7 +1237,12 @@ function updateProgressBar(sport, current, goal) {
     const progressFill = document.getElementById(`progress${sport}`);
     const progressText = document.getElementById(`progress${sport}Text`);
 
-    if (!progressFill || !progressText) return;
+    console.log(`updateProgressBar(${sport}):`, { current, goal, progressFill: !!progressFill, progressText: !!progressText });
+
+    if (!progressFill || !progressText) {
+        console.warn(`Éléments non trouvés pour ${sport}`);
+        return;
+    }
 
     const percentage = goal > 0 ? Math.min((current / goal) * 100, 100) : 0;
 

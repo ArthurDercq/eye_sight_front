@@ -577,3 +577,34 @@ body {
     color: #666;
     font-weight: 500;
 }
+
+/* Styles pour les statistiques hebdomadaires compactes */
+.chart-title-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.weekly-stats-compact {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    color: #666;
+}
+
+.stat-compact strong {
+    color: #667eea;
+    font-weight: 600;
+}
+
+.stat-separator {
+    color: #ddd;
+    font-weight: bold;
+}
+
+.distance-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+}

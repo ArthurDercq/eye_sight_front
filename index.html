@@ -70,6 +70,7 @@
                 <div class="sport-filter">
                     <label for="sportFilter">Sport :</label>
                     <select id="sportFilter" onchange="loadLastActivityWithFilter()">
+                        <option value="" selected>Toutes</option>
                         <option value="Run">Run</option>
                         <option value="Bike">Bike</option>
                         <option value="Trail">Trail</option>
@@ -167,9 +168,9 @@
                         <div class="chart-header">
                             <h3>Heures d'activité par semaine</h3>
                             <div class="week-nav">
-                                <button onclick="changeWeeklyView(-1)">← 1 sem.</button>
+                                <button onclick="changeWeeklyView(-1)">←</button>
                                 <span id="weeklyRangeLabel">10 dernières semaines</span>
-                                <button onclick="changeWeeklyView(1)">1 sem. →</button>
+                                <button onclick="changeWeeklyView(1)">→</button>
                             </div>
                         </div>
                         <div class="chart-container">
@@ -180,15 +181,29 @@
                     <!-- Kilomètres par semaine -->
                     <div class="card">
                         <div class="chart-header">
-                            <h3>Kilomètres par semaine</h3>
-                            <div class="distance-filter">
+                            <div class="chart-title-group">
+                                <h3>Kilomètres par semaine</h3>
+                                <!-- Statistiques de la semaine courante -->
+                                <div id="weeklyDistanceStats" class="weekly-stats-compact">
+                                    <span class="stat-compact"><strong id="statDistance">-</strong> km</span>
+                                    <span class="stat-separator">•</span>
+                                    <span class="stat-compact"><strong id="statElevation">-</strong> D+</span>
+                                    <span class="stat-separator">•</span>
+                                    <span class="stat-compact"><strong id="statTime">-</strong> h</span>
+                                </div>
+                            </div>
+                            <div class="distance-controls">
                                 <select id="distanceSportFilter" onchange="loadWeeklyDistance()">
                                     <option value="Run">Run</option>
                                     <option value="Trail">Trail</option>
                                     <option value="Bike">Bike</option>
                                     <option value="Swim">Swim</option>
-                                    <option value="Run,Trail">Run & Trail</option>
+                                    <option value="Run,Trail" selected>Run & Trail</option>
                                 </select>
+                                <div class="week-nav">
+                                    <button onclick="changeWeeklyView(-1)">←</button>
+                                    <button onclick="changeWeeklyView(1)">→</button>
+                                </div>
                             </div>
                         </div>
                         <div class="chart-container">

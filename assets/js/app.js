@@ -2,6 +2,24 @@ const API_BASE = 'http://localhost:3000/api';
 let currentToken = null;
 let charts = {};
 
+// Palette de couleurs HawkSight
+const COLORS = {
+    charcoal: '#0B0C10',
+    steel: '#3A3F47',
+    mist: '#F2F2F2',
+    amber: '#E8832A',
+    amberLight: '#ff9942',
+    glacier: '#3DB2E0',
+    moss: '#6DAA75'
+};
+
+// Configuration globale Chart.js pour le thème sombre
+if (typeof Chart !== 'undefined') {
+    Chart.defaults.color = COLORS.mist;
+    Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.1)';
+    Chart.defaults.font.family = "'Inter', sans-serif";
+}
+
 // Gestion de l'état de l'application
 function showPage(pageId) {
     document.querySelectorAll('.page').forEach(page => {
@@ -9,6 +27,16 @@ function showPage(pageId) {
     });
     document.getElementById(pageId).classList.add('active');
     updateNavigation();
+
+    // Charger les KPI quand on accède à la page Chiffres clés
+    if (pageId === 'kpiPage') {
+        loadKPIsWithFilter();
+    }
+
+    // Charger le calendrier quand on accède à la page Calendrier
+    if (pageId === 'calendarPage') {
+        loadCalendar();
+    }
 }
 
 function updateNavigation() {
@@ -20,7 +48,8 @@ function updateNavigation() {
     if (currentToken) {
         navButtons.innerHTML = `
             <button class="btn btn-secondary" onclick="showPage('dashboardPage')">Dashboard</button>
-            <button class="btn btn-secondary" onclick="showPage('homePage')">Accueil</button>
+            <button class="btn btn-secondary" onclick="showPage('kpiPage')">Chiffres clés</button>
+            <button class="btn btn-secondary" onclick="showPage('calendarPage')">Calendrier</button>
             <button class="btn btn-primary" onclick="logout()">Déconnexion</button>
         `;
         if (currentPage === 'homePage') {
@@ -186,6 +215,7 @@ async function loadAnalytics() {
     await loadDailyHours();
     await loadWeeklyHours();
     await loadWeeklyDistance();
+    await loadRepartition();
     loadGoals();
     await updateGoalsProgress();
 }
@@ -305,7 +335,7 @@ function displayKPIs(kpis) {
                 datasets: [{
                     label: 'Nombre d\'activités',
                     data: counts,
-                    backgroundColor: '#667eea',
+                    backgroundColor: COLORS.glacier,
                     borderRadius: 5
                 }]
             },
@@ -609,8 +639,12 @@ let polylineInteractive, polylineStatic;
 
 
 async function loadActivityElevation(sportType = null) {
+    console.log('loadActivityElevation appelée avec sportType:', sportType);
     const headers = getAuthHeaders();
-    if (!headers) return;
+    if (!headers) {
+        console.log('Pas de headers auth');
+        return;
+    }
 
     try {
         // Si sportType est vide ou null, ne pas ajouter le paramètre
@@ -618,10 +652,12 @@ async function loadActivityElevation(sportType = null) {
             ? `${API_BASE}/activities/last_activity_streams?sport_type=${encodeURIComponent(sportType)}`
             : `${API_BASE}/activities/last_activity_streams`;
 
+        console.log('Fetching elevation data from:', url);
         const response = await fetch(url, {
             headers: headers
         });
 
+        console.log('Response status:', response.status);
         if (!response.ok) {
             console.log('Pas de données d\'élévation disponibles');
             clearElevationChart();
@@ -629,6 +665,7 @@ async function loadActivityElevation(sportType = null) {
         }
 
         const data = await response.json();
+        console.log('Données reçues:', data);
 
         if (!data.streams || data.streams.length === 0) {
             console.log('Aucun stream d\'élévation trouvé');
@@ -636,6 +673,7 @@ async function loadActivityElevation(sportType = null) {
             return;
         }
 
+        console.log('Appel de displayElevationProfile avec', data.streams.length, 'points');
         displayElevationProfile(data.streams);
 
     } catch (error) {
@@ -661,6 +699,12 @@ function clearElevationChart() {
 // Affichage du graphique de dénivelé
 // -----------------------------
 function displayElevationProfile(streams) {
+    // Rétablir le canvas s'il a été supprimé
+    const container = document.getElementById('elevationContainer');
+    if (container && !container.querySelector('#elevationChart')) {
+        container.innerHTML = '<canvas id="elevationChart" width="600" height="200"></canvas>';
+    }
+
     const canvas = document.getElementById('elevationChart');
     if (!canvas) {
         console.error('Canvas elevationChart non trouvé');
@@ -669,14 +713,6 @@ function displayElevationProfile(streams) {
 
     if (charts.elevation) {
         charts.elevation.destroy();
-    }
-
-    // Rétablir le canvas s'il a été supprimé
-    const container = document.getElementById('elevationContainer');
-    if (container && !container.querySelector('#elevationChart')) {
-        container.innerHTML = '<canvas id="elevationChart" width="600" height="200"></canvas>';
-        const newCanvas = document.getElementById('elevationChart');
-        if (!newCanvas) return;
     }
 
     const ctx = canvas.getContext('2d');
@@ -692,11 +728,11 @@ function displayElevationProfile(streams) {
             datasets: [{
                 label: 'Altitude (m)',
                 data: elevations,
-                borderColor: '#7B68EE',
+                borderColor: COLORS.amber,
                 borderWidth: 2,
                 pointRadius: 0,
                 fill: true,
-                backgroundColor: 'rgba(123,104,238,0.2)',
+                backgroundColor: 'rgba(232, 131, 42, 0.2)',
                 tension: 0.3
             }]
         },
@@ -757,8 +793,11 @@ async function loadDailyHours() {
 
         if (response.ok) {
             const data = await response.json();
+            console.log('loadDailyHours - Données reçues:', data);
             displayDailyHours(data);
             updateWeekLabel(data);
+        } else {
+            console.error('Erreur réponse API:', response.status, response.statusText);
         }
     } catch (error) {
         console.error('Erreur chargement heures quotidiennes:', error);
@@ -775,27 +814,45 @@ function displayDailyHours(data) {
 
     const ctx = canvas.getContext('2d');
 
+    console.log('displayDailyHours - Structure des données:', {
+        hasLabels: !!data.labels,
+        hasDatasets: !!data.datasets,
+        datasetCount: data.datasets?.length || 0
+    });
+
     // Utiliser les données formatées du backend
     const labels = data.labels || ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
 
-    // Palette de couleurs pour les différents sports
+    // Palette de couleurs HawkSight pour les différents sports
     const sportColors = {
-        'Run': '#FF6B6B',
-        'Trail': '#4ECDC4',
-        'Bike': '#45B7D1',
-        'Swim': '#96CEB4',
-        'WeightTraining': '#FFEAA7',
-        'Hike': '#DDA0DD'
+        'Run': COLORS.amber,
+        'Trail': COLORS.amberLight,
+        'Bike': COLORS.glacier,
+        'Swim': COLORS.moss,
+        'WeightTraining': COLORS.steel,
+        'Hike': COLORS.mist
     };
 
-    // Préparer les datasets pour chaque sport avec conversion en heures
-    const datasets = data.datasets.map(dataset => ({
-        label: dataset.label,
-        data: dataset.data.map(minutes => minutes / 60), // Convertir les minutes en heures
-        backgroundColor: sportColors[dataset.label] || '#667eea',
-        borderColor: sportColors[dataset.label] || '#667eea',
-        borderWidth: 1
-    }));
+    // Si pas de datasets, afficher un graphique vide
+    let datasets = [];
+    if (data.datasets && data.datasets.length > 0) {
+        // Préparer les datasets pour chaque sport avec conversion en heures
+        datasets = data.datasets.map(dataset => {
+            console.log(`Dataset ${dataset.label}:`, dataset.data);
+            const hoursData = dataset.data.map(minutes => {
+                const hours = minutes / 60;
+                return hours;
+            });
+            console.log(`Dataset ${dataset.label} en heures:`, hoursData);
+            return {
+                label: dataset.label,
+                data: hoursData,
+                backgroundColor: sportColors[dataset.label] || '#667eea',
+                borderColor: sportColors[dataset.label] || '#667eea',
+                borderWidth: 1
+            };
+        });
+    }
 
     charts.dailyHours = new Chart(ctx, {
         type: 'bar',
@@ -813,14 +870,14 @@ function displayDailyHours(data) {
                 },
                 y: {
                     stacked: true,
-                    title: { display: true, text: 'Heures' },
+                    title: { display: false },
                     grid: { display: false },
                     beginAtZero: true,
                     max: 8,
                     ticks: {
                         stepSize: 1,
                         callback: function(value) {
-                            return value.toFixed(1) + 'h';
+                            return Math.round(value) + 'h';
                         }
                     }
                 }
@@ -849,7 +906,7 @@ function changeWeekOffset(delta) {
     }
 }
 
-function updateWeekLabel(weekInfo) {
+async function updateWeekLabel(weekInfo) {
     const label = document.getElementById('currentWeekLabel');
     if (currentWeekOffset === 0) {
         label.textContent = '';
@@ -857,10 +914,92 @@ function updateWeekLabel(weekInfo) {
         label.textContent = `Il y a ${currentWeekOffset} semaine${currentWeekOffset > 1 ? 's' : ''}`;
     }
 
-    // Afficher la semaine si disponible
-    //if (weekInfo && weekInfo.week) {
-      //  label.textContent += ` (${weekInfo.week})`;
-    //}
+    // Calculer et afficher la plage de dates (lundi - dimanche)
+    const today = new Date();
+    const thisMonday = today - (today.getDay() === 0 ? 6 : today.getDay() - 1) * 86400000;
+    const startWeek = new Date(thisMonday - currentWeekOffset * 7 * 86400000);
+    const monday = new Date(startWeek);
+    const sunday = new Date(startWeek);
+    sunday.setDate(monday.getDate() + 6);
+
+    const formatDate = (date) => {
+        const day = date.getDate().toString().padStart(2, '0');
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+        return `${day}/${month}`;
+    };
+
+    const rangeLabel = document.getElementById('dailyWeekRange');
+    if (rangeLabel) {
+        rangeLabel.textContent = `${formatDate(monday)} - ${formatDate(sunday)}`;
+    }
+
+    // Mettre à jour les statistiques de la semaine affichée
+    await updateWeekStats(monday, sunday);
+}
+
+async function updateWeekStats(monday, sunday) {
+    const headers = getAuthHeaders();
+    if (!headers) return;
+
+    try {
+        // Formater les dates pour l'API (YYYY-MM-DD)
+        const formatDateForAPI = (date) => {
+            const year = date.getFullYear();
+            const month = (date.getMonth() + 1).toString().padStart(2, '0');
+            const day = date.getDate().toString().padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        };
+
+        const startDate = formatDateForAPI(monday);
+
+        // Récupérer les données de la semaine pour chaque sport
+        const responses = await Promise.all([
+            fetch(`${API_BASE}/activities/filter_activities?sport_type=Run&start_date=${startDate}`, { headers }),
+            fetch(`${API_BASE}/activities/filter_activities?sport_type=Trail&start_date=${startDate}`, { headers })
+        ]);
+
+        const [runData, trailData] = await Promise.all(
+            responses.map(async r => r.ok ? await r.json() : { activities: [] })
+        );
+
+        // Filtrer les activités pour ne garder que celles de la semaine (entre lundi et dimanche)
+        const filterWeekActivities = (data) => {
+            if (!data.activities) return [];
+            return data.activities.filter(activity => {
+                const activityDate = new Date(activity.start_date);
+                return activityDate >= monday && activityDate <= sunday;
+            });
+        };
+
+        const runActivities = filterWeekActivities(runData);
+        const trailActivities = filterWeekActivities(trailData);
+
+        // Calculer les totaux pour Run + Trail
+        const allActivities = [...runActivities, ...trailActivities];
+
+        console.log('updateWeekStats - Activités trouvées:', allActivities.length);
+        if (allActivities.length > 0) {
+            console.log('Exemple d\'activité:', allActivities[0]);
+        }
+
+        // Essayer à la fois distance_km et distance
+        const totalDistance = allActivities.reduce((total, activity) => {
+            const distance = activity.distance_km || activity.distance || 0;
+            return total + distance;
+        }, 0);
+        const totalElevation = allActivities.reduce((total, activity) => total + (activity.total_elevation_gain || 0), 0);
+        const totalTime = allActivities.reduce((total, activity) => total + (activity.moving_time || 0), 0);
+
+        console.log('Totaux calculés:', { totalDistance, totalElevation, totalTime });
+
+        // Mettre à jour l'affichage
+        document.getElementById('statDistance').textContent = totalDistance.toFixed(1);
+        document.getElementById('statElevation').textContent = Math.round(totalElevation);
+        document.getElementById('statTime').textContent = (totalTime / 60).toFixed(1);
+
+    } catch (error) {
+        console.error('Erreur mise à jour stats semaine:', error);
+    }
 }
 
 // 2. Graphique des heures par semaine avec navigation
@@ -901,17 +1040,24 @@ function displayWeeklyHours(data) {
     const startIndex = Math.max(0, endIndex - 10);
     const weekData = data.slice(startIndex, endIndex);
 
-    // Créer les labels avec les dates au format DD/MM/YYYY
+    // Créer les labels avec les dates au format DD/MM
     const labels = weekData.map(d => {
         const date = new Date(d.period);
         const day = date.getDate().toString().padStart(2, '0');
         const month = (date.getMonth() + 1).toString().padStart(2, '0');
-        const year = date.getFullYear();
-        return `${day}/${month}/${year}`;
+        return `${day}/${month}`;
     });
 
     // Convertir moving_time (minutes) en heures
     const hours = weekData.map(d => d.moving_time / 60);
+
+    // Calculer et afficher la moyenne
+    const totalHours = hours.reduce((sum, h) => sum + h, 0);
+    const averageHours = hours.length > 0 ? totalHours / hours.length : 0;
+    const averageLabel = document.getElementById('weeklyHoursAverage');
+    if (averageLabel) {
+        averageLabel.textContent = `Moyenne : ${averageHours.toFixed(1)}h/semaine`;
+    }
 
     charts.weeklyHours = new Chart(ctx, {
         type: 'bar',
@@ -920,8 +1066,8 @@ function displayWeeklyHours(data) {
             datasets: [{
                 label: 'Heures',
                 data: hours,
-                backgroundColor: '#667eea',
-                borderColor: '#667eea',
+                backgroundColor: COLORS.glacier,
+                borderColor: COLORS.glacier,
                 borderWidth: 1
             }]
         },
@@ -933,14 +1079,14 @@ function displayWeeklyHours(data) {
                     grid: { display: false }
                 },
                 y: {
-                    title: { display: true, text: 'Heures' },
+                    title: { display: false },
                     grid: { display: false },
                     beginAtZero: true,
                     max: 15,
                     ticks: {
                         stepSize: 2,
                         callback: function(value) {
-                            return value.toFixed(1) + 'h';
+                            return Math.round(value) + 'h';
                         }
                     }
                 }
@@ -1031,33 +1177,24 @@ function displayWeeklyDistance(data) {
     const startIndex = Math.max(0, endIndex - 10);
     const weekData = data.slice(startIndex, endIndex);
 
-    // Mettre à jour les statistiques de la dernière semaine affichée (la plus récente)
-    if (weekData.length > 0) {
-        const lastWeek = weekData[weekData.length - 1];
-        const distance = (lastWeek.distance || 0).toFixed(1);
-        const elevation = Math.round(lastWeek.total_elevation_gain || 0);
-        const time = ((lastWeek.moving_time || 0) / 60).toFixed(1);
-
-        document.getElementById('statDistance').textContent = distance;
-        document.getElementById('statElevation').textContent = elevation;
-        document.getElementById('statTime').textContent = time;
-    } else {
-        document.getElementById('statDistance').textContent = '-';
-        document.getElementById('statElevation').textContent = '-';
-        document.getElementById('statTime').textContent = '-';
-    }
-
-    // Créer les labels avec les dates au format DD/MM/YYYY
+    // Créer les labels avec les dates au format DD/MM
     const labels = weekData.map(d => {
         const date = new Date(d.period);
         const day = date.getDate().toString().padStart(2, '0');
         const month = (date.getMonth() + 1).toString().padStart(2, '0');
-        const year = date.getFullYear();
-        return `${day}/${month}/${year}`;
+        return `${day}/${month}`;
     });
 
     // Utiliser directement la distance (déjà en km)
     const distances = weekData.map(d => d.distance);
+
+    // Calculer et afficher la moyenne
+    const totalDistance = distances.reduce((sum, d) => sum + d, 0);
+    const averageDistance = distances.length > 0 ? totalDistance / distances.length : 0;
+    const averageLabel = document.getElementById('weeklyDistanceAverage');
+    if (averageLabel) {
+        averageLabel.textContent = `Moyenne : ${averageDistance.toFixed(1)} km/semaine`;
+    }
 
     // Calculer l'échelle dynamique
     const maxDistance = Math.max(...distances, 0);
@@ -1071,8 +1208,8 @@ function displayWeeklyDistance(data) {
             datasets: [{
                 label: 'Distance (km)',
                 data: distances,
-                borderColor: '#764ba2',
-                backgroundColor: 'rgba(118, 75, 162, 0.1)',
+                borderColor: COLORS.amber,
+                backgroundColor: 'rgba(232, 131, 42, 0.1)',
                 borderWidth: 2,
                 fill: true,
                 tension: 0.3
@@ -1086,7 +1223,7 @@ function displayWeeklyDistance(data) {
                     grid: { display: false }
                 },
                 y: {
-                    title: { display: true, text: 'Kilomètres' },
+                    title: { display: false },
                     grid: { display: false },
                     beginAtZero: true,
                     suggestedMax: suggestedMax,
@@ -1112,7 +1249,108 @@ function displayWeeklyDistance(data) {
     });
 }
 
-// 4. Gestion des objectifs hebdomadaires
+// 4. Graphique de répartition des activités
+async function loadRepartition() {
+    const headers = getAuthHeaders();
+    if (!headers) return;
+
+    const sportFilter = document.getElementById('repartitionSportFilter').value;
+    const weeks = document.getElementById('repartitionWeeksFilter').value;
+    const sportTypes = sportFilter.split(',');
+
+    try {
+        let url = `${API_BASE}/plot/repartition_run?weeks=${weeks}`;
+        if (sportTypes.length > 0) {
+            const sportParams = sportTypes.map(s => `sport_type=${encodeURIComponent(s)}`).join('&');
+            url += `&${sportParams}`;
+        }
+
+        const response = await fetch(url, { headers });
+
+        if (response.ok) {
+            const data = await response.json();
+            displayRepartition(data);
+        }
+    } catch (error) {
+        console.error('Erreur chargement répartition:', error);
+    }
+}
+
+function displayRepartition(data) {
+    const canvas = document.getElementById('repartitionChart');
+    if (!canvas) return;
+
+    if (charts.repartition) {
+        charts.repartition.destroy();
+    }
+
+    const ctx = canvas.getContext('2d');
+
+    // Couleurs HawkSight par type de sport
+    const sportColors = {
+        'Run': COLORS.amber,
+        'Trail': COLORS.amberLight,
+        'Bike': COLORS.glacier,
+        'Swim': COLORS.moss,
+        'Run,Trail': COLORS.amber  // Orange pour Run & Trail combiné
+    };
+
+    // Récupérer le sport sélectionné
+    const selectedSport = document.getElementById('repartitionSportFilter').value;
+    const color = sportColors[selectedSport] || COLORS.amber;
+
+    // Créer un dégradé de couleurs pour chaque catégorie
+    const backgroundColors = data.labels.map((label, index) => {
+        const opacity = 0.7 - (index * 0.15); // Dégradé d'opacité
+        return color + Math.round(opacity * 255).toString(16).padStart(2, '0');
+    });
+
+    charts.repartition = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: data.labels || [],
+            datasets: [{
+                label: 'Nombre d\'activités',
+                data: data.values || [],
+                backgroundColor: backgroundColors,
+                borderColor: color,
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: 'y',
+            scales: {
+                x: {
+                    grid: { display: false },
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1,
+                        callback: function(value) {
+                            return Math.round(value);
+                        }
+                    }
+                },
+                y: {
+                    grid: { display: false }
+                }
+            },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `${context.parsed.x} activité${context.parsed.x > 1 ? 's' : ''}`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// 5. Gestion des objectifs hebdomadaires
 function loadGoals() {
     const goals = JSON.parse(localStorage.getItem('weekly_goals') || '{}');
 
@@ -1258,6 +1496,133 @@ function updateProgressBar(sport, current, goal) {
         progressFill.style.background = '#F39C12'; // Orange
     } else {
         progressFill.style.background = '#E74C3C'; // Rouge
+    }
+}
+
+// -----------------------------
+// Calendrier
+// -----------------------------
+let currentCalendarDate = new Date();
+
+function loadCalendar() {
+    generateCalendar(currentCalendarDate);
+}
+
+function previousMonth() {
+    currentCalendarDate.setMonth(currentCalendarDate.getMonth() - 1);
+    generateCalendar(currentCalendarDate);
+}
+
+function nextMonth() {
+    currentCalendarDate.setMonth(currentCalendarDate.getMonth() + 1);
+    generateCalendar(currentCalendarDate);
+}
+
+function generateCalendar(date) {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+
+    // Mettre à jour le titre
+    const monthNames = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+                       'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+    document.getElementById('currentMonthYear').textContent = `${monthNames[month]} ${year}`;
+
+    // Premier jour du mois
+    const firstDay = new Date(year, month, 1);
+    // Dernier jour du mois
+    const lastDay = new Date(year, month + 1, 0);
+
+    // Ajuster pour que la semaine commence le lundi (0 = dimanche, 1 = lundi, ...)
+    let startDayOfWeek = firstDay.getDay();
+    startDayOfWeek = startDayOfWeek === 0 ? 6 : startDayOfWeek - 1; // Convertir dimanche (0) en 6
+
+    // Date de début (peut être dans le mois précédent)
+    const startDate = new Date(firstDay);
+    startDate.setDate(firstDay.getDate() - startDayOfWeek);
+
+    const calendarGrid = document.getElementById('calendarGrid');
+    calendarGrid.innerHTML = '';
+
+    // En-têtes des jours de la semaine
+    const weekdays = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+    const weekdaysRow = document.createElement('div');
+    weekdaysRow.className = 'calendar-weekdays';
+
+    weekdays.forEach(day => {
+        const dayElement = document.createElement('div');
+        dayElement.className = 'calendar-weekday';
+        dayElement.textContent = day;
+        calendarGrid.appendChild(dayElement);
+    });
+
+    // En-tête pour la colonne des stats
+    const statsHeader = document.createElement('div');
+    statsHeader.className = 'calendar-week-stats-header';
+    statsHeader.textContent = 'Semaine';
+    calendarGrid.appendChild(statsHeader);
+
+    // Générer les jours
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    let currentDate = new Date(startDate);
+    let weekCount = 0;
+
+    while (currentDate <= lastDay || currentDate.getDay() !== 1) {
+        const weekElement = document.createElement('div');
+        weekElement.className = 'calendar-week';
+
+        // Générer 7 jours pour cette semaine
+        for (let i = 0; i < 7; i++) {
+            const dayElement = document.createElement('div');
+            dayElement.className = 'calendar-day';
+
+            const isCurrentMonth = currentDate.getMonth() === month;
+            const isToday = currentDate.getTime() === today.getTime();
+
+            if (!isCurrentMonth) {
+                dayElement.classList.add('other-month');
+            }
+            if (isToday) {
+                dayElement.classList.add('today');
+            }
+
+            const dayNumber = document.createElement('div');
+            dayNumber.className = 'calendar-day-number';
+            dayNumber.textContent = currentDate.getDate();
+            dayElement.appendChild(dayNumber);
+
+            // Zone pour les activités (à remplir plus tard)
+            const activitiesDiv = document.createElement('div');
+            activitiesDiv.className = 'calendar-day-activities';
+            dayElement.appendChild(activitiesDiv);
+
+            calendarGrid.appendChild(dayElement);
+
+            currentDate.setDate(currentDate.getDate() + 1);
+        }
+
+        // Ajouter la zone de stats de la semaine
+        const weekStats = document.createElement('div');
+        weekStats.className = 'calendar-week-stats';
+        weekStats.innerHTML = `
+            <div class="calendar-week-stats-item">
+                <span class="calendar-week-stats-label">Distance:</span>
+                <span class="calendar-week-stats-value">-</span>
+            </div>
+            <div class="calendar-week-stats-item">
+                <span class="calendar-week-stats-label">Temps:</span>
+                <span class="calendar-week-stats-value">-</span>
+            </div>
+        `;
+        calendarGrid.appendChild(weekStats);
+
+        weekCount++;
+
+        // Arrêter si on a dépassé le dernier jour du mois et qu'on est sur un lundi
+        if (currentDate > lastDay && currentDate.getDay() === 1) {
+            break;
+        }
     }
 }
 

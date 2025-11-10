@@ -1,0 +1,35 @@
+<!-- HawkSight - Mountain icon with sparkline
+     - Scalable (viewBox 0 0 100 100)
+     - Colors controlled by CSS variables:
+       --stroke: couleur principale du trait (ex: #F2F2F2)
+       --accent: couleur d'accent pour la sparkline (ex: #E8832A)
+       --bg: background si besoin (ex: transparent)
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-labelledby="hsTitle hsDesc">
+  <title id="hsTitle">HawkSight - Mountain icon</title>
+  <desc id="hsDesc">Icône représentant une montagne stylisée avec une courbe de performance (sparkline) intégrée.</desc>
+
+  <style>
+    :root{
+      --stroke: #F2F2F2; /* default blanc brume */
+      --accent: #E8832A; /* default orange ambré */
+      --bg: none;
+    }
+    /* remove background fill by default; set --bg if you want a filled shape */
+    .bg { fill: var(--bg); }
+    .mountain { fill: none; stroke: var(--stroke); stroke-width: 4.5; stroke-linejoin: round; stroke-linecap: round; }
+    .spark { fill: none; stroke: var(--accent); stroke-width: 3; stroke-linejoin: round; stroke-linecap: round; }
+  </style>
+
+  <!-- Optional background circle (comment out if you don't want a circle) -->
+  <!-- <circle cx="50" cy="50" r="48" class="bg"/> -->
+
+  <!-- Mountain outline (stylized peaks) -->
+  <path class="mountain" d="M8 72 L28 40 L44 56 L58 30 L80 72" />
+
+  <!-- Secondary inner ridge to add depth -->
+  <path class="mountain" d="M20 72 L36 48 L46 60 L60 38" opacity="0.85"/>
+
+  <!-- Sparkline (performance) placed along the lower/mid slope -->
+  <polyline class="spark" points="24,60 35,48 46,56 58,42 70,54" />
+</svg>

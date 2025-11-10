@@ -3,7 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EyeSight</title>
+    <title>HawkSight</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
     <link rel="stylesheet" href="assets/css/style.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
     <link
@@ -18,7 +24,22 @@
     <!-- Navigation -->
     <nav class="navbar">
         <div class="nav-content">
-            <div class="logo">EyeSight</div>
+            <div class="logo">
+                <div class="logo-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-labelledby="hsTitle hsDesc">
+                        <title id="hsTitle">HawkSight</title>
+                        <desc id="hsDesc">Icône représentant une montagne stylisée avec une courbe de performance intégrée</desc>
+                        <style>
+                            .mountain { fill: none; stroke: var(--stroke); stroke-width: 4.5; stroke-linejoin: round; stroke-linecap: round; }
+                            .spark { fill: none; stroke: var(--accent); stroke-width: 3; stroke-linejoin: round; stroke-linecap: round; }
+                        </style>
+                        <path class="mountain" d="M8 72 L28 40 L44 56 L58 30 L80 72" />
+                        <path class="mountain" d="M20 72 L36 48 L46 60 L60 38" opacity="0.85"/>
+                        <polyline class="spark" points="24,60 35,48 46,56 58,42 70,54" />
+                    </svg>
+                </div>
+                <span>HawkSight</span>
+            </div>
             <div class="nav-buttons" id="navButtons">
                 <!-- Sera rempli dynamiquement -->
             </div>
@@ -29,8 +50,8 @@
         <!-- Page d'accueil -->
         <div id="homePage" class="page active">
             <div class="welcome-section">
-                <h1>Bienvenue sur EyeSight</h1>
-                <p>Votre dashboard personnel pour analyser vos performances sportives</p>
+                <h1>Bienvenue sur HawkSight</h1>
+                <p>L'œil du faucon sur vos performances sportives</p>
                 <button class="btn btn-primary" onclick="showLogin()">Se connecter</button>
             </div>
 
@@ -94,43 +115,44 @@
                       style="height: 300px; border-radius: 12px; overflow: hidden; margin-top: 1rem;">
                     </div>
                     <div id="lastActivityMapStatic"
-                        style="height: 300px; border-radius: 12px; overflow: hidden; margin-top: 1rem;">
+                        style="height: 300px; border-radius: 12px; overflow: hidden; margin-top: 1rem; display: none;">
                     </div>
                     <div id="activityMap"
                         style="height: 300px; border-radius: 12px; overflow: hidden; margin-top: 1rem; display: none;">
                     </div>
                 </div>
+            </div>
 
-                <div class="card">
-                    <h3>Objectifs de la semaine</h3>
-                    <div id="currentWeekDisplay" style="font-size: 0.8rem; color: #555; margin-bottom: 1rem;"></div>
-                    <div class="goals-container">
-                        <div class="goal-item">
-                            <label>Objectif Run & Trail (km):</label>
-                            <input type="number" id="goalRunTrail" onchange="saveGoals()" placeholder="0">
-                            <div class="progress-bar">
-                                <div class="progress-fill" id="progressRunTrail"></div>
-                            </div>
-                            <span id="progressRunTrailText">0/0 km</span>
+            <!-- Objectifs de la semaine sur toute la largeur -->
+            <div class="card" style="margin-top: 2rem;">
+                <h3>Objectifs de la semaine</h3>
+                <div id="currentWeekDisplay" style="font-size: 0.8rem; color: #555; margin-bottom: 1rem;"></div>
+                <div class="goals-grid">
+                    <div class="goal-item">
+                        <label>Objectif Run & Trail (km):</label>
+                        <input type="number" id="goalRunTrail" onchange="saveGoals()" placeholder="0">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressRunTrail"></div>
                         </div>
+                        <span id="progressRunTrailText">0/0 km</span>
+                    </div>
 
-                        <div class="goal-item">
-                            <label>Objectif Vélo (km):</label>
-                            <input type="number" id="goalBike" onchange="saveGoals()" placeholder="0">
-                            <div class="progress-bar">
-                                <div class="progress-fill" id="progressBike"></div>
-                            </div>
-                            <span id="progressBikeText">0/0 km</span>
+                    <div class="goal-item">
+                        <label>Objectif Vélo (km):</label>
+                        <input type="number" id="goalBike" onchange="saveGoals()" placeholder="0">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressBike"></div>
                         </div>
+                        <span id="progressBikeText">0/0 km</span>
+                    </div>
 
-                        <div class="goal-item">
-                            <label>Objectif Natation (km):</label>
-                            <input type="number" id="goalSwim" onchange="saveGoals()" placeholder="0">
-                            <div class="progress-bar">
-                                <div class="progress-fill" id="progressSwim"></div>
-                            </div>
-                            <span id="progressSwimText">0/0 km</span>
+                    <div class="goal-item">
+                        <label>Objectif Natation (km):</label>
+                        <input type="number" id="goalSwim" onchange="saveGoals()" placeholder="0">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressSwim"></div>
                         </div>
+                        <span id="progressSwimText">0/0 km</span>
                     </div>
                 </div>
             </div>
@@ -151,11 +173,22 @@
                     <!-- Heures par jour de la semaine -->
                     <div class="card">
                         <div class="chart-header">
-                            <h3>Heures d'activité par jour</h3>
+                            <div class="chart-title-group">
+                                <h3>Heures d'activité par jour</h3>
+                                <span id="dailyWeekRange" class="week-range-label">-</span>
+                                <!-- Statistiques de la semaine courante -->
+                                <div id="weeklyDistanceStats" class="weekly-stats-compact">
+                                    <span class="stat-compact"><strong id="statDistance">-</strong> km</span>
+                                    <span class="stat-separator">•</span>
+                                    <span class="stat-compact"><strong id="statElevation">-</strong> D+</span>
+                                    <span class="stat-separator">•</span>
+                                    <span class="stat-compact"><strong id="statTime">-</strong> h</span>
+                                </div>
+                            </div>
                             <div class="week-controls">
-                                <button onclick="changeWeekOffset(-1)">←</button>
+                                <button onclick="changeWeekOffset(1)">←</button>
                                 <span id="currentWeekLabel">Semaine en cours</span>
-                                <button onclick="changeWeekOffset(1)">→</button>
+                                <button onclick="changeWeekOffset(-1)">→</button>
                             </div>
                         </div>
                         <div class="chart-container">
@@ -166,11 +199,14 @@
                     <!-- Heures par semaine -->
                     <div class="card">
                         <div class="chart-header">
-                            <h3>Heures d'activité par semaine</h3>
+                            <div class="chart-title-group">
+                                <h3>Heures d'activité par semaine</h3>
+                                <span id="weeklyHoursAverage" class="week-range-label">-</span>
+                            </div>
                             <div class="week-nav">
-                                <button onclick="changeWeeklyView(-1)">←</button>
+                                <button onclick="changeWeeklyView(1)">←</button>
                                 <span id="weeklyRangeLabel">10 dernières semaines</span>
-                                <button onclick="changeWeeklyView(1)">→</button>
+                                <button onclick="changeWeeklyView(-1)">→</button>
                             </div>
                         </div>
                         <div class="chart-container">
@@ -183,14 +219,7 @@
                         <div class="chart-header">
                             <div class="chart-title-group">
                                 <h3>Kilomètres par semaine</h3>
-                                <!-- Statistiques de la semaine courante -->
-                                <div id="weeklyDistanceStats" class="weekly-stats-compact">
-                                    <span class="stat-compact"><strong id="statDistance">-</strong> km</span>
-                                    <span class="stat-separator">•</span>
-                                    <span class="stat-compact"><strong id="statElevation">-</strong> D+</span>
-                                    <span class="stat-separator">•</span>
-                                    <span class="stat-compact"><strong id="statTime">-</strong> h</span>
-                                </div>
+                                <span id="weeklyDistanceAverage" class="week-range-label">-</span>
                             </div>
                             <div class="distance-controls">
                                 <select id="distanceSportFilter" onchange="loadWeeklyDistance()">
@@ -201,8 +230,8 @@
                                     <option value="Run,Trail" selected>Run & Trail</option>
                                 </select>
                                 <div class="week-nav">
-                                    <button onclick="changeWeeklyView(-1)">←</button>
-                                    <button onclick="changeWeeklyView(1)">→</button>
+                                    <button onclick="changeWeeklyView(1)">←</button>
+                                    <button onclick="changeWeeklyView(-1)">→</button>
                                 </div>
                             </div>
                         </div>
@@ -211,9 +240,36 @@
                         </div>
                     </div>
 
+                    <!-- Répartition des activités -->
+                    <div class="card">
+                        <div class="chart-header">
+                            <h3>Répartition des activités</h3>
+                            <div class="repartition-controls">
+                                <select id="repartitionSportFilter" onchange="loadRepartition()">
+                                    <option value="Run,Trail" selected>Run & Trail</option>
+                                    <option value="Run">Run</option>
+                                    <option value="Trail">Trail</option>
+                                    <option value="Bike">Bike</option>
+                                </select>
+                                <select id="repartitionWeeksFilter" onchange="loadRepartition()">
+                                    <option value="4">Ce mois</option>
+                                    <option value="8">2 mois</option>
+                                    <option value="12">3 mois</option>
+                                    <option value="24">6 mois</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="repartitionChart"></canvas>
+                        </div>
+                    </div>
+
                 </div>
             </div>
+        </div>
 
+        <!-- Page Chiffres clés -->
+        <div id="kpiPage" class="page">
             <div class="kpi-section">
                 <div class="kpi-filter">
                   <h2>Mes chiffres clefs</h2>
@@ -232,6 +288,23 @@
                 <div class="card">
                     <h3>Nombre d'activités par sport</h3>
                     <div id="activityCountChartContainer" style="width: 100%; margin-top: 20px;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Page Calendrier -->
+        <div id="calendarPage" class="page">
+            <div class="calendar-section">
+                <div class="calendar-header">
+                    <button class="btn btn-secondary" onclick="previousMonth()">←</button>
+                    <h2 id="currentMonthYear">Janvier 2025</h2>
+                    <button class="btn btn-secondary" onclick="nextMonth()">→</button>
+                </div>
+
+                <div class="calendar-container">
+                    <div id="calendarGrid" class="calendar-grid">
+                        <!-- Le calendrier sera généré ici par JavaScript -->
+                    </div>
                 </div>
             </div>
         </div>

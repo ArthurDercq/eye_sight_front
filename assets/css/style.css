@@ -54,6 +54,36 @@ body {
     line-height: 1.6;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    position: relative;
+    overflow-x: hidden;
+}
+
+/* Pattern en arrière-plan - bas de page uniquement */
+body::before {
+    content: '';
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 400px;
+    background-image: url('../images/icons/pattern_long.svg');
+    background-repeat: repeat-x;
+    background-position: left bottom;
+    background-size: 1500px auto;
+    opacity: 1;
+    z-index: 0;
+    pointer-events: none;
+    animation: patternMove 60s linear infinite;
+    transform: scaleY(-1);
+}
+
+@keyframes patternMove {
+    0% {
+        background-position: 0 0;
+    }
+    100% {
+        background-position: 3000px 0;
+    }
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -200,6 +230,8 @@ h3 {
     max-width: 1400px;
     margin: 0 auto;
     padding: var(--spacing-lg);
+    position: relative;
+    z-index: 1;
 }
 
 .page {
@@ -227,15 +259,72 @@ h3 {
     font-size: 1.3rem;
 }
 
+/* Summary cards grid - largeur totale = 1 card normale */
+.summary-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--spacing-lg);
+    margin-bottom: var(--spacing-lg);
+    max-width: calc(50% - var(--spacing-lg) / 2);
+}
+
+/* Weekly summary card with gradient */
+.weekly-summary-card {
+    background: linear-gradient(135deg, rgba(232, 131, 42, 0.2) 0%, rgba(61, 178, 224, 0.2) 100%);
+    border: 1px solid rgba(232, 131, 42, 0.5);
+    backdrop-filter: blur(10px);
+}
+
+/* Monthly summary card with gradient */
+.monthly-summary-card {
+    background: linear-gradient(135deg, rgba(61, 178, 224, 0.2) 0%, rgba(109, 170, 117, 0.2) 100%);
+    border: 1px solid rgba(61, 178, 224, 0.5);
+    backdrop-filter: blur(10px);
+}
+
 /* === PAGE D'ACCUEIL === */
 .welcome-section {
+    position: relative;
     text-align: center;
     padding: var(--spacing-xl) var(--spacing-lg);
     max-width: 600px;
     margin: 4rem auto;
 }
 
+/* Option 1 : Logo en grand et transparent en arrière-plan */
+.welcome-logo-bg {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 500px;
+    height: 500px;
+    z-index: 0;
+    pointer-events: none;
+    opacity: 1;
+}
+
+.welcome-logo-bg svg {
+    width: 100%;
+    height: 100%;
+}
+
+/* Option 2 : Logo en petit en dessous du bouton */
+.welcome-logo-small {
+    margin-top: var(--spacing-xl);
+    display: flex;
+    justify-content: center;
+    opacity: 0.6;
+}
+
+.welcome-logo-small img {
+    width: 150px;
+    height: auto;
+}
+
 .welcome-section h1 {
+    position: relative;
+    z-index: 1;
     font-size: 3rem;
     margin-bottom: var(--spacing-md);
     background: linear-gradient(135deg, var(--color-mist) 0%, var(--color-glacier) 100%);
@@ -245,9 +334,16 @@ h3 {
 }
 
 .welcome-section p {
+    position: relative;
+    z-index: 1;
     font-size: 1.1rem;
     color: rgba(242, 242, 242, 0.7);
     margin-bottom: var(--spacing-lg);
+}
+
+.welcome-section .btn {
+    position: relative;
+    z-index: 1;
 }
 
 /* === PAGE DE CONNEXION === */
@@ -370,6 +466,27 @@ h3 {
     margin-bottom: var(--spacing-lg);
 }
 
+/* Grille étendue pour 3 colonnes */
+.dashboard-grid-extended {
+    display: grid;
+    grid-template-columns: 1fr 0.8fr 1fr;
+    gap: var(--spacing-lg);
+    margin-bottom: var(--spacing-lg);
+}
+
+/* Colonne centrale avec 2 résumés empilés */
+.summary-cards-column {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-lg);
+}
+
+/* Réduire padding et marges pour les cards compactes */
+.summary-card-compact {
+    padding: 1rem !important;
+    margin-bottom: 0 !important;
+}
+
 /* === ACTIVITÉ === */
 .activity-header {
     margin-bottom: var(--spacing-md);
@@ -480,7 +597,7 @@ h3 {
 }
 
 .analytics-grid .card {
-    aspect-ratio: 1;
+    aspect-ratio: 1.55;
     display: flex;
     flex-direction: column;
 }

@@ -53,6 +53,11 @@
                 <h1>Bienvenue sur HawkSight</h1>
                 <p>L'œil du faucon sur vos performances sportives</p>
                 <button class="btn btn-primary" onclick="showLogin()">Se connecter</button>
+
+                <!-- Logo en petit en dessous du bouton -->
+                <div class="welcome-logo-small">
+                    <img src="assets/images/HawkSight_transparent_Couleur.png" alt="HawkSight Logo">
+                </div>
             </div>
 
         </div>
@@ -86,8 +91,60 @@
             </div>
             <div id="updateStatus"></div>
 
-            <!-- Dernière activité -->
+            <!-- Résumés période (semaine et mois) - En haut côte à côte -->
+            <div class="summary-cards-grid">
+                <!-- Résumé hebdomadaire -->
+                <div class="card weekly-summary-card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                        <h5 style="color: var(--color-mist); font-family: 'Poppins', sans-serif; margin: 0; font-size: 1rem;">
+                            Cette Semaine
+                        </h5>
+                        <span id="weeklyTrend" style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; font-weight: 600;"></span>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="color: rgba(242, 242, 242, 0.6); font-family: 'Inter', sans-serif; font-size: 0.85rem;">Distance</span>
+                            <span id="weeklySummaryDistance" style="color: #E8832A; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem;">- km</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="color: rgba(242, 242, 242, 0.6); font-family: 'Inter', sans-serif; font-size: 0.85rem;">Dénivelé</span>
+                            <span id="weeklySummaryElevation" style="color: #3DB2E0; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem;">- m</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="color: rgba(242, 242, 242, 0.6); font-family: 'Inter', sans-serif; font-size: 0.85rem;">Sessions</span>
+                            <span id="weeklySummarySessions" style="color: #6DAA75; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem;">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Résumé mensuel -->
+                <div class="card monthly-summary-card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                        <h5 style="color: var(--color-mist); font-family: 'Poppins', sans-serif; margin: 0; font-size: 1rem;">
+                            Ce Mois
+                        </h5>
+                        <span id="monthlyTrend" style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; font-weight: 600;"></span>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="color: rgba(242, 242, 242, 0.6); font-family: 'Inter', sans-serif; font-size: 0.85rem;">Distance</span>
+                            <span id="monthlySummaryDistance" style="color: #E8832A; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem;">- km</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="color: rgba(242, 242, 242, 0.6); font-family: 'Inter', sans-serif; font-size: 0.85rem;">Dénivelé</span>
+                            <span id="monthlySummaryElevation" style="color: #3DB2E0; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem;">- m</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="color: rgba(242, 242, 242, 0.6); font-family: 'Inter', sans-serif; font-size: 0.85rem;">Sessions</span>
+                            <span id="monthlySummarySessions" style="color: #6DAA75; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem;">-</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dernière activité et Trace/Profil côte à côte -->
             <div class="dashboard-grid">
+                <!-- Dernière activité -->
                 <div class="card">
                     <div class="chart-header">
                         <h3>
@@ -111,6 +168,7 @@
                     </div>
                 </div>
 
+                <!-- Trace et profil -->
                 <div class="card" style="display: flex; flex-direction: column;">
                     <h3>
                         <img src="assets/images/icons/montagne.svg" alt="Montagne" class="title-icon">
@@ -128,49 +186,6 @@
 
                     <div id="elevationContainer" style="flex: 1; min-height: 200px; margin-top: 2rem;">
                         <canvas id="elevationChart" width="600" height="200"></canvas>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Objectifs de la semaine sur toute la largeur -->
-            <div class="card" style="margin-top: 2rem;">
-                <div class="chart-header">
-                    <h3>
-                        <img src="assets/images/icons/coeur.svg" alt="Coeur" class="title-icon">
-                        Objectifs de la semaine
-                    </h3>
-                    <div class="week-controls">
-                        <button onclick="changeGoalsWeek(-1)">←</button>
-                        <span id="currentWeekDisplay">Semaine en cours</span>
-                        <button id="nextWeekBtn" onclick="changeGoalsWeek(1)" disabled>→</button>
-                    </div>
-                </div>
-                <div class="goals-grid">
-                    <div class="goal-item">
-                        <label>Run & Trail (km)</label>
-                        <input type="number" id="goalRunTrail" onchange="saveGoals()" placeholder="0">
-                        <div class="progress-bar">
-                            <div class="progress-fill" id="progressRunTrail"></div>
-                        </div>
-                        <span id="progressRunTrailText">0/0 km</span>
-                    </div>
-
-                    <div class="goal-item">
-                        <label>Vélo (km)</label>
-                        <input type="number" id="goalBike" onchange="saveGoals()" placeholder="0">
-                        <div class="progress-bar">
-                            <div class="progress-fill" id="progressBike"></div>
-                        </div>
-                        <span id="progressBikeText">0/0 km</span>
-                    </div>
-
-                    <div class="goal-item">
-                        <label>Objectif Natation (km)</label>
-                        <input type="number" id="goalSwim" onchange="saveGoals()" placeholder="0">
-                        <div class="progress-bar">
-                            <div class="progress-fill" id="progressSwim"></div>
-                        </div>
-                        <span id="progressSwimText">0/0 km</span>
                     </div>
                 </div>
             </div>
@@ -253,7 +268,9 @@
                     <!-- Répartition des activités -->
                     <div class="card">
                         <div class="chart-header">
-                            <h3>Répartition des activités</h3>
+                            <div class="chart-title-group">
+                                <h3>Répartition des activités</h3>
+                            </div>
                             <div class="repartition-controls">
                                 <select id="repartitionSportFilter" onchange="loadRepartition()">
                                     <option value="Run,Trail" selected>Run & Trail</option>
@@ -283,7 +300,7 @@
             <div class="kpi-section">
                 <div class="kpi-filter">
                   <h2>Mes chiffres clefs</h2>
-                      <label for="yearFilter">Année :</label>
+                      <label for="yearFilter"></label>
                       <select id="yearFilter" onchange="loadKPIsWithFilter()">
                           <option value="">Toutes</option>
                           <option value="2025">2025</option>

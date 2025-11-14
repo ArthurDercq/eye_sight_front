@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="3000" height="400" viewBox="0 0 3000 400">
+  <defs>
+    <linearGradient id="fade" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0%" stop-color="#3A3F47" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#3A3F47" stop-opacity="0.4"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Lignes anguleuses continues (début et fin à la même hauteur) -->
+  <polyline
+    points="
+      0,320 200,260 500,290 800,240 1100,270 1400,220 1700,250 2000,200 2300,230 2600,260 2900,290 3000,320
+    "
+    stroke="url(#fade)" stroke-width="4" fill="none"
+  />
+
+  <polyline
+    points="
+      0,240 200,200 450,220 750,180 1050,200 1400,160 1700,180 2000,140 2300,160 2600,180 2850,200 3000,240
+    "
+    stroke="#3A3F47" stroke-opacity="0.6" stroke-width="3.5" fill="none"
+  />
+
+  <polyline
+    points="
+      0,170 200,150 500,170 800,130 1100,150 1500,120 1800,140 2100,100 2400,120 2700,140 2900,150 3000,170
+    "
+    stroke="#3A3F47" stroke-opacity="0.5" stroke-width="3" fill="none"
+  />
+
+  <polyline
+    points="
+      0,100 250,120 600,100 950,80 1300,100 1650,60 2000,80 2350,40 2650,60 2850,80 2950,100 3000,100
+    "
+    stroke="#3A3F47" stroke-opacity="0.4" stroke-width="2.5" fill="none"
+  />
+</svg>

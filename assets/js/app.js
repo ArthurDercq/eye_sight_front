@@ -223,6 +223,7 @@ async function loadAnalytics() {
     await loadRepartition();
     loadGoals();
     await updateGoalsProgress();
+    await updateMonthlySummary();
 }
 
 async function loadKPIs() {
@@ -267,42 +268,48 @@ function displayKPIs(kpis) {
     const container = document.getElementById('kpiContainer');
     container.innerHTML = '';
 
-    const kpiLabels = {
-        total_km_run: 'Km Run',
-        total_km_trail: 'Km Trail',
-        total_km_run_trail: 'Km Run + Trail',
-        total_km_bike: 'Km Bike',
-        total_km_swim: 'Km Swim',
-        total_hours: 'Heures totales',
-        total_dplus_run: 'D+ Run',
-        total_dplus_trail: 'D+ Trail',
-        total_dplus_run_trail: 'D+ Run + Trail',
-        total_dplus_bike: 'D+ Bike'
+    const kpiConfig = {
+        total_km_run: { unit: 'km', label: 'Course à pied' },
+        total_km_trail: { unit: 'km', label: 'Trail' },
+        total_km_bike: { unit: 'km', label: 'Vélo' },
+        total_km_swim: { unit: 'km', label: 'Natation' },
+        total_hours: { unit: 'h', label: 'Sport' },
+        total_dplus_run_trail: { unit: 'm', label: 'dénivelé en courant' },
+        total_dplus_bike: { unit: 'm', label: 'dénivelé à vélo' }
     };
+
+    // Liste des KPIs à afficher (exclure ceux non souhaités)
+    const kpisToDisplay = [
+        'total_km_run',
+        'total_km_trail',
+        'total_km_bike',
+        'total_km_swim',
+        'total_hours',
+        'total_dplus_run_trail',
+        'total_dplus_bike'
+    ];
 
     const formatNumber = (num) => {
-        if (Number.isInteger(num)) {
-            return new Intl.NumberFormat('fr-FR').format(num);
-        } else {
-            return new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(num);
-        }
+        // Arrondir vers le haut tous les chiffres
+        const roundedNum = Math.ceil(num);
+        const formatted = new Intl.NumberFormat('fr-FR').format(roundedNum);
+        // Remplacer l'espace (séparateur de milliers français) par un point
+        return formatted.replace(/\s/g, '.');
     };
 
-    // Afficher toutes les KPI sauf "nombre d'activités par sport"
-    Object.entries(kpis).forEach(([key, value]) => {
-        if (key === "nombre d'activités par sport") return; // skip ici
+    // Afficher uniquement les KPIs sélectionnés
+    kpisToDisplay.forEach((key) => {
+        if (kpis[key] === undefined || kpis[key] === null) return;
 
         const kpiCard = document.createElement('div');
         kpiCard.className = 'kpi-card';
-        let displayValue = value;
-
-        if (typeof value === 'number') {
-            displayValue = formatNumber(value);
-        }
+        const value = kpis[key];
+        const displayValue = formatNumber(value);
+        const config = kpiConfig[key];
 
         kpiCard.innerHTML = `
-            <div class="kpi-value">${displayValue}</div>
-            <div class="kpi-label">${kpiLabels[key] || key.replace(/_/g, ' ')}</div>
+            <div class="kpi-value">${displayValue} ${config.unit}</div>
+            <div class="kpi-label" style="color: rgba(242, 242, 242, 0.6);">${config.label}</div>
         `;
         container.appendChild(kpiCard);
     });
@@ -450,25 +457,27 @@ function displayLastActivity(activity) {
 
         <div class="activity-info">
             <div class="activity-stat">
-                <div class="activity-stat-value">${activity.distance_km.toFixed(2)} km</div>
+                <div class="activity-stat-value" style="color: ${COLORS.amber};">${activity.distance_km.toFixed(2)} km</div>
                 <div class="activity-stat-label">Distance</div>
             </div>
             <div class="activity-stat">
-                <div class="activity-stat-value">${activity.duree_hms}</div>
+                <div class="activity-stat-value" style="color: ${COLORS.glacier};">${activity.duree_hms}</div>
                 <div class="activity-stat-label">Temps</div>
             </div>
             <div class="activity-stat">
-                <div class="activity-stat-value">${Math.round(activity.denivele_m || 0)} m</div>
+                <div class="activity-stat-value" style="color: ${COLORS.glacier};">${Math.round(activity.denivele_m || 0)} m</div>
                 <div class="activity-stat-label">Dénivelé+</div>
             </div>
             <div class="activity-stat">
-                <div class="activity-stat-value">${activity.vitesse_kmh.toFixed(1)} km/h</div>
-                <div class="activity-stat-label">Vitesse moy.</div>
-            </div>
-            <div class="activity-stat">
-                <div class="activity-stat-value">${activity.allure_min_per_km} min/km</div>
+                <div class="activity-stat-value" style="color: ${COLORS.amber};">${activity.allure_min_per_km} min/km</div>
                 <div class="activity-stat-label">Allure</div>
             </div>
+            ${activity.bpm_moyen ? `
+            <div class="activity-stat">
+                <div class="activity-stat-value" style="color: ${COLORS.moss};">${Math.round(activity.bpm_moyen)} bpm</div>
+                <div class="activity-stat-label">BPM moyen</div>
+            </div>
+            ` : ''}
         </div>
     `;
 
@@ -837,14 +846,14 @@ function displayDailyHours(data) {
     // Utiliser les données formatées du backend
     const labels = data.labels || ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
 
-    // Palette de couleurs en nuances de gris/noir/anthracite
+    // Palette de couleurs avec nuances de bleu et violet-bleu
     const sportColors = {
-        'Run': '#2A2D35',        // Gris anthracite foncé
-        'Trail': '#4A4F5C',      // Gris anthracite moyen
-        'Bike': '#6B7280',       // Gris moyen
-        'Swim': '#8B92A0',       // Gris clair
-        'WeightTraining': '#1F2229', // Noir anthracite
-        'Hike': '#5A5F6C'        // Gris foncé
+        'Run': '#3DB2E0',        // Bleu glacier (charte graphique)
+        'Trail': '#1E6A8F',      // Bleu glacier beaucoup plus foncé
+        'Bike': '#7B6BC8',       // Violet nuancé bleu
+        'Swim': '#8B92A0',       // Gris clair (inchangé)
+        'WeightTraining': '#9477D9', // Violet nuancé
+        'Hike': '#5A5F6C'        // Gris foncé (inchangé)
     };
 
     // Si pas de datasets, afficher un graphique vide
@@ -889,8 +898,10 @@ function displayDailyHours(data) {
                     beginAtZero: true,
                     max: 8,
                     ticks: {
-                        stepSize: 1,
+                        stepSize: 2,
                         callback: function(value) {
+                            // Afficher uniquement les heures paires (2h, 4h, 6h, 8h), pas le 0h
+                            if (value === 0) return '';
                             return Math.round(value) + 'h';
                         }
                     }
@@ -899,7 +910,7 @@ function displayDailyHours(data) {
             plugins: {
                 legend: {
                     display: true,
-                    position: 'top'
+                    position: 'bottom'
                 },
                 tooltip: {
                     callbacks: {
@@ -1015,7 +1026,8 @@ async function loadWeeklyHours() {
     if (!headers) return;
 
     try {
-        const weeks = 10 + Math.abs(currentWeeklyOffset);
+        // Ajouter 1 semaine pour s'assurer que la semaine en cours est incluse
+        const weeks = 11 + Math.abs(currentWeeklyOffset);
         const url = `${API_BASE}/plot/weekly_bar?value_col=moving_time&weeks=${weeks}`;
         const response = await fetch(url, { headers });
 
@@ -1159,7 +1171,8 @@ async function loadWeeklyDistance() {
     const sportTypes = sportFilter.split(',');
 
     try {
-        const weeks = 10 + Math.abs(currentWeeklyOffset);
+        // Ajouter 1 semaine pour s'assurer que la semaine en cours est incluse
+        const weeks = 11 + Math.abs(currentWeeklyOffset);
         let url = `${API_BASE}/plot/weekly_bar?value_col=distance&weeks=${weeks}`;
         if (sportTypes.length > 0) {
             const sportParams = sportTypes.map(s => `sport_types=${encodeURIComponent(s)}`).join('&');
@@ -1477,33 +1490,15 @@ async function updateGoalsProgress() {
         const startDate = formatDateForAPI(monday);
         const endDate = formatDateForAPI(sunday);
 
-        // Récupérer les données de la semaine courante pour chaque sport
-        const responses = await Promise.all([
-            fetch(`${API_BASE}/activities/filter_activities?sport_type=Run&start_date=${startDate}&end_date=${endDate}`, { headers }),
-            fetch(`${API_BASE}/activities/filter_activities?sport_type=Trail&start_date=${startDate}&end_date=${endDate}`, { headers }),
-            fetch(`${API_BASE}/activities/filter_activities?sport_type=Bike&start_date=${startDate}&end_date=${endDate}`, { headers }),
-            fetch(`${API_BASE}/activities/filter_activities?sport_type=Swim&start_date=${startDate}&end_date=${endDate}`, { headers })
-        ]);
+        // Récupérer TOUTES les activités de la semaine (sans filtrer par sport)
+        const response = await fetch(`${API_BASE}/activities/filter_activities?start_date=${startDate}&end_date=${endDate}`, { headers });
 
-        const [runData, trailData, bikeData, swimData] = await Promise.all(
-            responses.map(async r => {
-                if (!r.ok) {
-                    console.warn('Erreur API:', r.status, r.statusText);
-                    return [];
-                }
-                const json = await r.json();
-                return json;
-            })
-        );
+        if (!response.ok) {
+            console.warn('Erreur API:', response.status, response.statusText);
+            return;
+        }
 
-        console.log('Données reçues:', {
-            runData: runData?.length || runData?.activities?.length || 0,
-            trailData: trailData?.length || trailData?.activities?.length || 0,
-            bikeData: bikeData?.length || bikeData?.activities?.length || 0,
-            swimData: swimData?.length || swimData?.activities?.length || 0
-        });
-
-        const goals = JSON.parse(localStorage.getItem('weekly_goals') || '{}');
+        const allActivitiesData = await response.json();
 
         // Normaliser les données (gérer différents formats de réponse API)
         const normalizeData = (data) => {
@@ -1512,19 +1507,23 @@ async function updateGoalsProgress() {
             return [];
         };
 
-        // Filtrer les activités pour ne garder que celles de la semaine (entre lundi et dimanche)
-        const filterWeekActivities = (data) => {
-            const activities = normalizeData(data);
-            return activities.filter(activity => {
-                const activityDate = new Date(activity.start_date);
-                return activityDate >= monday && activityDate <= sunday;
-            });
-        };
+        const allActivities = normalizeData(allActivitiesData);
 
-        const runActivities = filterWeekActivities(runData);
-        const trailActivities = filterWeekActivities(trailData);
-        const bikeActivities = filterWeekActivities(bikeData);
-        const swimActivities = filterWeekActivities(swimData);
+        // Filtrer par type de sport
+        const runActivities = allActivities.filter(a => a.sport_type === 'Run');
+        const trailActivities = allActivities.filter(a => a.sport_type === 'Trail');
+        const bikeActivities = allActivities.filter(a => a.sport_type === 'Bike');
+        const swimActivities = allActivities.filter(a => a.sport_type === 'Swim');
+
+        console.log('Activités de la semaine:', {
+            total: allActivities.length,
+            run: runActivities.length,
+            trail: trailActivities.length,
+            bike: bikeActivities.length,
+            swim: swimActivities.length
+        });
+
+        const goals = JSON.parse(localStorage.getItem('weekly_goals') || '{}');
 
         console.log('Activités filtrées:', {
             run: runActivities.length,
@@ -1557,6 +1556,25 @@ async function updateGoalsProgress() {
         updateProgressBar('Bike', bikeKm, goals.bike || 0);
         updateProgressBar('Swim', swimKm, goals.swim || 0);
 
+        // Récupérer les données de la semaine précédente pour comparaison
+        const prevMonday = new Date(monday);
+        prevMonday.setDate(monday.getDate() - 7);
+        const prevSunday = new Date(sunday);
+        prevSunday.setDate(sunday.getDate() - 7);
+
+        const prevStartDate = formatDateForAPI(prevMonday);
+        const prevEndDate = formatDateForAPI(prevSunday);
+
+        const prevResponse = await fetch(`${API_BASE}/activities/filter_activities?start_date=${prevStartDate}&end_date=${prevEndDate}`, { headers });
+        let prevActivities = [];
+        if (prevResponse.ok) {
+            const prevData = await prevResponse.json();
+            prevActivities = normalizeData(prevData);
+        }
+
+        // Mettre à jour la card "Cette Semaine" avec TOUTES les activités
+        updateWeeklySummary(allActivities, prevActivities, goals);
+
     } catch (error) {
         console.error('Erreur mise à jour progression:', error);
     }
@@ -1587,6 +1605,181 @@ function updateProgressBar(sport, current, goal) {
         progressFill.style.background = '#F39C12'; // Orange
     } else {
         progressFill.style.background = '#E74C3C'; // Rouge
+    }
+}
+
+function updateWeeklySummary(allActivities, prevActivities, goals) {
+    // Calculer les totaux pour TOUTES les activités
+    const getDistance = (activity) => activity.distance_km || activity.distance || 0;
+    const getElevation = (activity) => activity.total_elevation_gain || 0;
+    const getHours = (activity) => (activity.moving_time || activity.elapsed_time || 0) / 60; // Convertir minutes en heures
+
+    const totalDistance = allActivities.reduce((sum, act) => sum + getDistance(act), 0);
+    const totalElevation = allActivities.reduce((sum, act) => sum + getElevation(act), 0);
+    const totalHours = allActivities.reduce((sum, act) => sum + getHours(act), 0);
+    const totalSessions = allActivities.length; // Compte toutes les activités (Run, Trail, Bike, Swim, WeightTraining, etc.)
+
+    // Calculer les heures de la semaine précédente
+    const prevHours = prevActivities.reduce((sum, act) => sum + getHours(act), 0);
+
+    // Calculer le pourcentage de différence
+    let percentageDiff = 0;
+    if (prevHours > 0) {
+        percentageDiff = ((totalHours - prevHours) / prevHours) * 100;
+    } else if (totalHours > 0) {
+        percentageDiff = 100; // Si aucune activité la semaine d'avant mais des activités cette semaine
+    }
+
+    // Déterminer la tendance avec le pourcentage
+    const trendEl = document.getElementById('weeklyTrend');
+    if (trendEl) {
+        const absPercentage = Math.abs(percentageDiff);
+        if (percentageDiff > 0) {
+            trendEl.textContent = `↑ ${absPercentage.toFixed(0)}%`;
+            trendEl.style.color = '#6DAA75'; // Vert (moss)
+        } else if (percentageDiff < 0) {
+            trendEl.textContent = `↓ ${absPercentage.toFixed(0)}%`;
+            trendEl.style.color = '#E74C3C'; // Rouge
+        } else {
+            trendEl.textContent = '→ 0%';
+            trendEl.style.color = '#3A3F47'; // Gris
+        }
+    }
+
+    // Calculer le pourcentage de l'objectif global (somme des objectifs)
+    const totalGoal = (goals.runTrail || 0) + (goals.bike || 0) + (goals.swim || 0);
+    const percentage = totalGoal > 0 ? Math.min((totalDistance / totalGoal) * 100, 100) : 0;
+
+    // Mettre à jour les éléments DOM
+    const distanceEl = document.getElementById('weeklySummaryDistance');
+    const elevationEl = document.getElementById('weeklySummaryElevation');
+    const sessionsEl = document.getElementById('weeklySummarySessions');
+    const progressBar = document.getElementById('weeklyProgressBar');
+    const progressText = document.getElementById('weeklyProgressText');
+
+    if (distanceEl) distanceEl.textContent = `${totalDistance.toFixed(1)} km`;
+    if (elevationEl) elevationEl.textContent = `${Math.round(totalElevation).toLocaleString()} m`;
+    if (sessionsEl) sessionsEl.textContent = totalSessions;
+    if (progressBar) progressBar.style.width = `${percentage}%`;
+    if (progressText) progressText.textContent = `${Math.round(percentage)}% de l'objectif hebdomadaire`;
+}
+
+async function updateMonthlySummary() {
+    const headers = getAuthHeaders();
+    if (!headers) return;
+
+    try {
+        // Calculer les dates du mois en cours (1er du mois à aujourd'hui)
+        const today = new Date();
+        const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+        firstDayOfMonth.setHours(0, 0, 0, 0);
+
+        const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        lastDayOfMonth.setHours(23, 59, 59, 999);
+
+        // Formater les dates pour l'API (YYYY-MM-DD)
+        const formatDateForAPI = (date) => {
+            const year = date.getFullYear();
+            const month = (date.getMonth() + 1).toString().padStart(2, '0');
+            const day = date.getDate().toString().padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        };
+
+        const startDate = formatDateForAPI(firstDayOfMonth);
+        const endDate = formatDateForAPI(lastDayOfMonth);
+
+        // Récupérer TOUTES les activités du mois (sans filtrer par sport)
+        const response = await fetch(`${API_BASE}/activities/filter_activities?start_date=${startDate}&end_date=${endDate}`, { headers });
+
+        if (!response.ok) {
+            console.warn('Erreur API:', response.status, response.statusText);
+            return;
+        }
+
+        const allActivitiesData = await response.json();
+
+        // Normaliser les données
+        const normalizeData = (data) => {
+            if (Array.isArray(data)) return data;
+            if (data?.activities && Array.isArray(data.activities)) return data.activities;
+            return [];
+        };
+
+        const allActivities = normalizeData(allActivitiesData);
+
+        const getDistance = (activity) => activity.distance_km || activity.distance || 0;
+        const getElevation = (activity) => activity.total_elevation_gain || 0;
+        const getHours = (activity) => (activity.moving_time || activity.elapsed_time || 0) / 60; // Convertir minutes en heures
+
+        const totalDistance = allActivities.reduce((sum, act) => sum + getDistance(act), 0);
+        const totalElevation = allActivities.reduce((sum, act) => sum + getElevation(act), 0);
+        const totalHours = allActivities.reduce((sum, act) => sum + getHours(act), 0);
+        const totalSessions = allActivities.length; // Compte toutes les activités (Run, Trail, Bike, Swim, WeightTraining, etc.)
+
+        // Récupérer les données du mois précédent pour comparaison
+        // IMPORTANT: On compare avec le même nombre de jours du mois précédent
+        const daysPassed = today.getDate(); // Nombre de jours écoulés dans le mois en cours
+
+        const prevFirstDay = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        // Pour comparer équitablement, on prend les mêmes jours du mois précédent
+        const prevLastDayToCompare = new Date(today.getFullYear(), today.getMonth() - 1, daysPassed);
+
+        const prevStartDate = formatDateForAPI(prevFirstDay);
+        const prevEndDate = formatDateForAPI(prevLastDayToCompare);
+
+        const prevResponse = await fetch(`${API_BASE}/activities/filter_activities?start_date=${prevStartDate}&end_date=${prevEndDate}`, { headers });
+        let prevActivities = [];
+        if (prevResponse.ok) {
+            const prevData = await prevResponse.json();
+            prevActivities = normalizeData(prevData);
+        }
+
+        // Calculer les heures du mois précédent (sur le même nombre de jours)
+        const prevHours = prevActivities.reduce((sum, act) => sum + getHours(act), 0);
+
+        // Calculer le pourcentage de différence
+        let percentageDiff = 0;
+        if (prevHours > 0) {
+            percentageDiff = ((totalHours - prevHours) / prevHours) * 100;
+        } else if (totalHours > 0) {
+            percentageDiff = 100; // Si aucune activité le mois d'avant mais des activités ce mois
+        }
+
+        // Déterminer la tendance avec le pourcentage
+        const trendEl = document.getElementById('monthlyTrend');
+        if (trendEl) {
+            const absPercentage = Math.abs(percentageDiff);
+            if (percentageDiff > 0) {
+                trendEl.textContent = `↑ ${absPercentage.toFixed(0)}%`;
+                trendEl.style.color = '#6DAA75'; // Vert (moss)
+            } else if (percentageDiff < 0) {
+                trendEl.textContent = `↓ ${absPercentage.toFixed(0)}%`;
+                trendEl.style.color = '#E74C3C'; // Rouge
+            } else {
+                trendEl.textContent = '→ 0%';
+                trendEl.style.color = '#3A3F47'; // Gris
+            }
+        }
+
+        // Calculer le pourcentage du mois écoulé
+        const daysInMonth = lastDayOfMonth.getDate();
+        const monthProgress = (daysPassed / daysInMonth) * 100;
+
+        // Mettre à jour les éléments DOM
+        const distanceEl = document.getElementById('monthlySummaryDistance');
+        const elevationEl = document.getElementById('monthlySummaryElevation');
+        const sessionsEl = document.getElementById('monthlySummarySessions');
+        const progressBar = document.getElementById('monthlyProgressBar');
+        const progressText = document.getElementById('monthlyProgressText');
+
+        if (distanceEl) distanceEl.textContent = `${totalDistance.toFixed(1)} km`;
+        if (elevationEl) elevationEl.textContent = `${Math.round(totalElevation).toLocaleString()} m`;
+        if (sessionsEl) sessionsEl.textContent = totalSessions;
+        if (progressBar) progressBar.style.width = `${monthProgress}%`;
+        if (progressText) progressText.textContent = `${daysPassed}/${daysInMonth} jours du mois`;
+
+    } catch (error) {
+        console.error('Erreur mise à jour résumé mensuel:', error);
     }
 }
 

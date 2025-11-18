@@ -83,14 +83,6 @@
 
         <!-- Page dashboard -->
         <div id="dashboardPage" class="page">
-            <div class="dashboard-header">
-                <div class="update-buttons">
-                    <button class="btn btn-secondary" onclick="updateDatabase()">Mettre à jour la base de données</button>
-                    <button class="btn btn-secondary" onclick="updateStreams()">Mettre à jour les streams</button>
-                </div>
-            </div>
-            <div id="updateStatus"></div>
-
             <!-- Résumés période (semaine et mois) - En haut côte à côte -->
             <div class="summary-cards-grid">
                 <!-- Résumé hebdomadaire -->
@@ -291,6 +283,32 @@
                         </div>
                     </div>
 
+                    <!-- Allure moyenne par semaine -->
+                    <div class="card">
+                        <div class="chart-header">
+                            <div class="chart-title-group">
+                                <h3>Allure moyenne par semaine</h3>
+                                <span id="weeklyPaceAverage" class="week-range-label">-</span>
+                            </div>
+                            <div class="distance-controls">
+                                <select id="paceSportFilter" onchange="loadWeeklyPace()">
+                                    <option value="Run">Run</option>
+                                    <option value="Trail">Trail</option>
+                                    <option value="Bike">Bike</option>
+                                    <option value="Swim">Swim</option>
+                                    <option value="Run,Trail" selected>Run & Trail</option>
+                                </select>
+                                <div class="week-nav">
+                                    <button onclick="changeWeeklyView(1)">←</button>
+                                    <button onclick="changeWeeklyView(-1)">→</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="weeklyPaceChart"></canvas>
+                        </div>
+                    </div>
+
                 </div>
             </div>
         </div>
@@ -299,7 +317,8 @@
         <div id="kpiPage" class="page">
             <div class="kpi-section">
                 <div class="kpi-filter">
-                  <h2>Mes chiffres clefs</h2>
+                  <div class="kpi-title-filter-group">
+                      <h2>Mes chiffres clefs</h2>
                       <label for="yearFilter"></label>
                       <select id="yearFilter" onchange="loadKPIsWithFilter()">
                           <option value="">Toutes</option>
@@ -308,13 +327,104 @@
                           <option value="2023">2023</option>
                           <!-- ajoute les années souhaitées -->
                       </select>
+                  </div>
                 </div>
-                <!-- KPIs -->
-                <div id="kpiContainer" class="kpi-grid"></div>
 
-                <div class="card">
-                    <h3>Nombre d'activités par sport</h3>
-                    <div id="activityCountChartContainer" style="width: 100%; margin-top: 20px;"></div>
+                <!-- Layout en deux colonnes : KPIs + Graph à gauche, Records à droite -->
+                <div class="kpi-layout-grid">
+                    <!-- Colonne gauche : KPIs et graphique -->
+                    <div class="kpi-left-column">
+                        <!-- KPIs -->
+                        <div id="kpiContainer" class="kpi-grid"></div>
+
+                        <div class="card">
+                            <h3>Nombre d'activités par sport</h3>
+                            <div id="activityCountChartContainer" style="width: 100%; margin-top: 20px;"></div>
+                        </div>
+                    </div>
+
+                    <!-- Colonne droite : Records -->
+                    <div class="kpi-right-column">
+                        <div class="card records-card">
+                            <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem;">
+                                <img src="assets/images/icons/trophee.svg" alt="Trophée" class="title-icon">
+                                <h3 style="margin: 0;">Mes Records</h3>
+                            </div>
+                            <div class="records-list">
+                                <!-- Record 5km -->
+                                <div class="record-item">
+                                    <div class="record-distance">5 km</div>
+                                    <div class="record-details">
+                                        <div class="record-time">--:--</div>
+                                        <div class="record-pace">-- min/km</div>
+                                    </div>
+                                </div>
+
+                                <!-- Record 10km -->
+                                <div class="record-item">
+                                    <div class="record-distance">10 km</div>
+                                    <div class="record-details">
+                                        <div class="record-time">--:--</div>
+                                        <div class="record-pace">-- min/km</div>
+                                    </div>
+                                </div>
+
+                                <!-- Record Semi-marathon -->
+                                <div class="record-item">
+                                    <div class="record-distance">Semi</div>
+                                    <div class="record-details">
+                                        <div class="record-time">--:--</div>
+                                        <div class="record-pace">-- min/km</div>
+                                    </div>
+                                </div>
+
+                                <!-- Record 30km -->
+                                <div class="record-item">
+                                    <div class="record-distance">30 km</div>
+                                    <div class="record-details">
+                                        <div class="record-time">--:--</div>
+                                        <div class="record-pace">-- min/km</div>
+                                    </div>
+                                </div>
+
+                                <!-- Record Marathon -->
+                                <div class="record-item">
+                                    <div class="record-distance">Marathon</div>
+                                    <div class="record-details">
+                                        <div class="record-time">--:--</div>
+                                        <div class="record-pace">-- min/km</div>
+                                    </div>
+                                </div>
+
+                                <!-- Record 50km -->
+                                <div class="record-item">
+                                    <div class="record-distance">50 km</div>
+                                    <div class="record-details">
+                                        <div class="record-time">--:--</div>
+                                        <div class="record-pace">-- min/km</div>
+                                    </div>
+                                </div>
+
+                                <!-- Record 75km -->
+                                <div class="record-item">
+                                    <div class="record-distance">75 km</div>
+                                    <div class="record-details">
+                                        <div class="record-time">--:--</div>
+                                        <div class="record-pace">-- min/km</div>
+                                    </div>
+                                </div>
+
+                                <!-- Record 100km -->
+                                <div class="record-item">
+                                    <div class="record-distance">100 km</div>
+                                    <div class="record-details">
+                                        <div class="record-time">--:--</div>
+                                        <div class="record-pace">-- min/km</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

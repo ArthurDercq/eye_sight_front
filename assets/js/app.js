@@ -99,6 +99,10 @@ async function login(event) {
         if (response.ok) {
             setSecureToken(data.access_token);
             statusEl.innerHTML = '<div class="status-message success">Connexion réussie!</div>';
+
+            // Mettre à jour automatiquement les données en arrière-plan
+            autoUpdateData();
+
             setTimeout(() => {
                 showPage('dashboardPage');
                 loadDashboard();
@@ -117,54 +121,41 @@ function logout() {
     showPage('homePage');
 }
 
-// Mise à jour base de données
-async function updateDatabase() {
-    const statusEl = document.getElementById('updateStatus');
-    statusEl.innerHTML = '<div class="status-message loading">Mise à jour en cours...</div>';
-
+// Mise à jour automatique et silencieuse de la base de données
+async function autoUpdateData() {
     const headers = getAuthHeaders();
     if (!headers) return;
 
+    console.log('🔄 Mise à jour automatique des données en cours...');
+
     try {
-        const response = await fetch(`${API_BASE}/activities/update_db`, {
+        // Mettre à jour la base de données
+        const dbResponse = await fetch(`${API_BASE}/activities/update_db`, {
             method: 'POST',
             headers: headers
         });
 
-        const data = await response.json();
-
-        if (response.ok) {
-            statusEl.innerHTML = '<div class="status-message success">Base de données mise à jour!</div>';
+        if (dbResponse.ok) {
+            console.log('✅ Base de données mise à jour');
         } else {
-            statusEl.innerHTML = '<div class="status-message error">Erreur lors de la mise à jour</div>';
+            console.warn('⚠️ Erreur lors de la mise à jour de la base de données');
         }
-    } catch (error) {
-        statusEl.innerHTML = '<div class="status-message error">Erreur de connexion</div>';
-    }
-}
 
-async function updateStreams() {
-    const statusEl = document.getElementById('updateStatus');
-    statusEl.innerHTML = '<div class="status-message loading">Mise à jour des streams...</div>';
-
-    const headers = getAuthHeaders();
-    if (!headers) return;
-
-    try {
-        const response = await fetch(`${API_BASE}/activities/update_streams`, {
+        // Mettre à jour les streams
+        const streamsResponse = await fetch(`${API_BASE}/activities/update_streams`, {
             method: 'POST',
             headers: headers
         });
 
-        const data = await response.json();
-
-        if (response.ok) {
-            statusEl.innerHTML = '<div class="status-message success">Streams mis à jour!</div>';
+        if (streamsResponse.ok) {
+            console.log('✅ Streams mis à jour');
         } else {
-            statusEl.innerHTML = '<div class="status-message error">Erreur lors de la mise à jour</div>';
+            console.warn('⚠️ Erreur lors de la mise à jour des streams');
         }
+
+        console.log('✅ Mise à jour automatique terminée');
     } catch (error) {
-        statusEl.innerHTML = '<div class="status-message error">Erreur de connexion</div>';
+        console.error('❌ Erreur lors de la mise à jour automatique:', error);
     }
 }
 
@@ -221,6 +212,7 @@ async function loadAnalytics() {
     await loadWeeklyHours();
     await loadWeeklyDistance();
     await loadRepartition();
+    await loadWeeklyPace();
     loadGoals();
     await updateGoalsProgress();
     await updateMonthlySummary();
@@ -333,10 +325,23 @@ function displayKPIs(kpis) {
         const labels = [];
         const counts = [];
 
+        // Palette de couleurs identique au graphique "Heures d'activité par jour"
+        const sportColors = {
+            'Run': '#3DB2E0',        // Bleu glacier (charte graphique)
+            'Trail': '#1E6A8F',      // Bleu glacier beaucoup plus foncé
+            'Bike': '#7B6BC8',       // Violet nuancé bleu
+            'Swim': '#8B92A0',       // Gris clair
+            'WeightTraining': '#9477D9', // Violet nuancé
+            'Hike': '#5A5F6C'        // Gris foncé
+        };
+
+        const backgroundColors = [];
+
         sports.forEach(sport => {
             if (value[sport] !== undefined) {
                 labels.push(sport);
                 counts.push(value[sport]);
+                backgroundColors.push(sportColors[sport] || COLORS.glacier);
             }
         });
 
@@ -347,7 +352,7 @@ function displayKPIs(kpis) {
                 datasets: [{
                     label: 'Nombre d\'activités',
                     data: counts,
-                    backgroundColor: COLORS.glacier,
+                    backgroundColor: backgroundColors,
                     borderRadius: 5
                 }]
             },
@@ -819,6 +824,12 @@ async function loadDailyHours() {
             console.log('loadDailyHours - Données reçues:', data);
             displayDailyHours(data);
             updateWeekLabel(data);
+
+            // Mettre à jour les cartes "Cette Semaine" et "Ce Mois" si on est sur la semaine courante
+            if (currentWeekOffset === 0) {
+                await updateGoalsProgress();
+                await updateMonthlySummary();
+            }
         } else {
             console.error('Erreur réponse API:', response.status, response.statusText);
         }
@@ -1381,7 +1392,129 @@ function displayRepartition(data) {
     });
 }
 
-// 5. Gestion des objectifs hebdomadaires
+// 5. Graphique d'allure moyenne par semaine
+async function loadWeeklyPace() {
+    const headers = getAuthHeaders();
+    if (!headers) return;
+
+    const sportFilter = document.getElementById('paceSportFilter').value;
+    const sportTypes = sportFilter.split(',');
+
+    try {
+        const weeks = 11 + Math.abs(currentWeeklyOffset);
+        let url = `${API_BASE}/plot/weekly_pace?weeks=${weeks}`;
+        if (sportTypes.length > 0) {
+            const sportParams = sportTypes.map(s => `sport_types=${encodeURIComponent(s)}`).join('&');
+            url += `&${sportParams}`;
+        }
+
+        const response = await fetch(url, { headers });
+
+        if (response.ok) {
+            const data = await response.json();
+            displayWeeklyPace(data);
+        }
+    } catch (error) {
+        console.error('Erreur chargement allure hebdomadaire:', error);
+    }
+}
+
+function displayWeeklyPace(data) {
+    const canvas = document.getElementById('weeklyPaceChart');
+    if (!canvas) return;
+
+    if (charts.weeklyPace) {
+        charts.weeklyPace.destroy();
+    }
+
+    const ctx = canvas.getContext('2d');
+
+    // Prendre les 10 dernières semaines
+    const totalWeeks = data.length;
+    const endIndex = totalWeeks - currentWeeklyOffset;
+    const startIndex = Math.max(0, endIndex - 10);
+    const weekData = data.slice(startIndex, endIndex);
+
+    // Créer les labels avec les dates au format DD/MM
+    const labels = weekData.map(d => {
+        const date = new Date(d.period);
+        const day = date.getDate().toString().padStart(2, '0');
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+        return `${day}/${month}`;
+    });
+
+    // Récupérer les allures en min/km
+    const paces = weekData.map(d => d.pace_min_km);
+
+    // Calculer et afficher la moyenne
+    const totalPace = paces.reduce((sum, p) => sum + (p || 0), 0);
+    const averagePace = paces.length > 0 ? totalPace / paces.length : 0;
+    const averageLabel = document.getElementById('weeklyPaceAverage');
+    if (averageLabel) {
+        const minutes = Math.floor(averagePace);
+        const seconds = Math.round((averagePace - minutes) * 60);
+        averageLabel.textContent = `Moyenne : ${minutes}:${seconds.toString().padStart(2, '0')} min/km`;
+    }
+
+    // Calculer l'échelle dynamique (inversée car plus petit = mieux)
+    const minPace = Math.min(...paces.filter(p => p > 0), 10);
+    const maxPace = Math.max(...paces, 0);
+    const suggestedMin = Math.floor(minPace * 0.9); // 10% de marge en dessous
+    const suggestedMax = Math.ceil(maxPace * 1.1);  // 10% de marge au dessus
+
+    charts.weeklyPace = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Allure (min/km)',
+                data: paces,
+                borderColor: COLORS.glacier,
+                backgroundColor: 'rgba(61, 178, 224, 0.1)',
+                borderWidth: 2,
+                fill: true,
+                tension: 0.3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: {
+                    grid: { display: false }
+                },
+                y: {
+                    title: { display: false },
+                    grid: { display: false },
+                    suggestedMin: suggestedMin,
+                    suggestedMax: suggestedMax,
+                    ticks: {
+                        callback: function(value) {
+                            const minutes = Math.floor(value);
+                            const seconds = Math.round((value - minutes) * 60);
+                            return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                        }
+                    }
+                }
+            },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const pace = context.parsed.y;
+                            const minutes = Math.floor(pace);
+                            const seconds = Math.round((pace - minutes) * 60);
+                            return `${minutes}:${seconds.toString().padStart(2, '0')} min/km`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// 6. Gestion des objectifs hebdomadaires
 let goalsWeekOffset = 0;
 
 function loadGoals() {
@@ -1788,21 +1921,21 @@ async function updateMonthlySummary() {
 // -----------------------------
 let currentCalendarDate = new Date();
 
-function loadCalendar() {
-    generateCalendar(currentCalendarDate);
+async function loadCalendar() {
+    await generateCalendar(currentCalendarDate);
 }
 
-function previousMonth() {
+async function previousMonth() {
     currentCalendarDate.setMonth(currentCalendarDate.getMonth() - 1);
-    generateCalendar(currentCalendarDate);
+    await generateCalendar(currentCalendarDate);
 }
 
-function nextMonth() {
+async function nextMonth() {
     currentCalendarDate.setMonth(currentCalendarDate.getMonth() + 1);
-    generateCalendar(currentCalendarDate);
+    await generateCalendar(currentCalendarDate);
 }
 
-function generateCalendar(date) {
+async function generateCalendar(date) {
     const year = date.getFullYear();
     const month = date.getMonth();
 
@@ -1810,6 +1943,9 @@ function generateCalendar(date) {
     const monthNames = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
                        'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
     document.getElementById('currentMonthYear').textContent = `${monthNames[month]} ${year}`;
+
+    // Charger les activités du mois
+    const activities = await loadActivitiesForCalendar(year, month);
 
     // Premier jour du mois
     const firstDay = new Date(year, month, 1);
@@ -1852,9 +1988,23 @@ function generateCalendar(date) {
     let currentDate = new Date(startDate);
     let weekCount = 0;
 
+    // Couleurs des sports
+    const sportColors = {
+        'Run': { bg: 'rgba(232, 131, 42, 0.125)', color: '#E8832A' },
+        'Trail': { bg: 'rgba(232, 131, 42, 0.125)', color: '#E8832A' },
+        'Bike': { bg: 'rgba(61, 178, 224, 0.125)', color: '#3DB2E0' },
+        'Swim': { bg: 'rgba(109, 170, 117, 0.125)', color: '#6DAA75' },
+        'Hike': { bg: 'rgba(109, 170, 117, 0.125)', color: '#6DAA75' },
+        'WeightTraining': { bg: 'rgba(58, 63, 71, 0.125)', color: '#3A3F47' }
+    };
+
     while (currentDate <= lastDay || currentDate.getDay() !== 1) {
         const weekElement = document.createElement('div');
         weekElement.className = 'calendar-week';
+
+        // Variables pour calculer les stats de la semaine
+        let weekTotalDistance = 0;
+        let weekTotalTime = 0;
 
         // Générer 7 jours pour cette semaine
         for (let i = 0; i < 7; i++) {
@@ -1876,15 +2026,54 @@ function generateCalendar(date) {
             dayNumber.textContent = currentDate.getDate();
             dayElement.appendChild(dayNumber);
 
-            // Zone pour les activités (à remplir plus tard)
+            // Zone pour les activités avec tags de sport
             const activitiesDiv = document.createElement('div');
             activitiesDiv.className = 'calendar-day-activities';
-            dayElement.appendChild(activitiesDiv);
 
+            // Trouver les activités pour ce jour
+            const dateKey = currentDate.toISOString().split('T')[0];
+            const dayActivities = activities.filter(activity => {
+                const activityDate = new Date(activity.start_date).toISOString().split('T')[0];
+                return activityDate === dateKey;
+            });
+
+            // Calculer les totaux de la semaine
+            dayActivities.forEach(activity => {
+                weekTotalDistance += activity.distance || 0;
+                weekTotalTime += activity.moving_time || 0;
+            });
+
+            // Créer des tags pour chaque sport unique du jour
+            if (dayActivities.length > 0) {
+                const uniqueSports = [...new Set(dayActivities.map(a => a.sport_type))];
+                uniqueSports.forEach(sport => {
+                    const sportColor = sportColors[sport] || { bg: 'rgba(255, 255, 255, 0.1)', color: '#F2F2F2' };
+                    const badge = document.createElement('div');
+                    badge.className = 'calendar-sport-badge';
+                    badge.style.backgroundColor = sportColor.bg;
+                    badge.style.color = sportColor.color;
+                    badge.textContent = sport;
+                    activitiesDiv.appendChild(badge);
+                });
+            }
+
+            dayElement.appendChild(activitiesDiv);
             calendarGrid.appendChild(dayElement);
 
             currentDate.setDate(currentDate.getDate() + 1);
         }
+
+        // Formater le temps en XhYY (moving_time est en minutes)
+        const hours = Math.floor(weekTotalTime / 60);
+        const minutes = Math.floor(weekTotalTime % 60);
+        const timeFormatted = weekTotalTime > 0 ? `${hours}h${minutes > 0 ? minutes.toString().padStart(2, '0') : ''}` : '-';
+        const distanceFormatted = weekTotalDistance > 0 ? `${weekTotalDistance.toFixed(1)} km` : '-';
+
+        // Calculer l'allure moyenne pondérée (moving_time est en minutes, distance en km)
+        const weekAveragePace = weekTotalDistance > 0 ? weekTotalTime / weekTotalDistance : 0;
+        const paceMinutes = Math.floor(weekAveragePace);
+        const paceSeconds = Math.round((weekAveragePace - paceMinutes) * 60);
+        const paceFormatted = weekAveragePace > 0 ? `${paceMinutes}:${paceSeconds.toString().padStart(2, '0')} min/km` : '-';
 
         // Ajouter la zone de stats de la semaine
         const weekStats = document.createElement('div');
@@ -1892,11 +2081,15 @@ function generateCalendar(date) {
         weekStats.innerHTML = `
             <div class="calendar-week-stats-item">
                 <span class="calendar-week-stats-label">Distance:</span>
-                <span class="calendar-week-stats-value">-</span>
+                <span class="calendar-week-stats-value">${distanceFormatted}</span>
             </div>
             <div class="calendar-week-stats-item">
                 <span class="calendar-week-stats-label">Temps:</span>
-                <span class="calendar-week-stats-value">-</span>
+                <span class="calendar-week-stats-value">${timeFormatted}</span>
+            </div>
+            <div class="calendar-week-stats-item">
+                <span class="calendar-week-stats-label">Allure:</span>
+                <span class="calendar-week-stats-value">${paceFormatted}</span>
             </div>
         `;
         calendarGrid.appendChild(weekStats);
@@ -1908,6 +2101,39 @@ function generateCalendar(date) {
             break;
         }
     }
+}
+
+async function loadActivitiesForCalendar(year, month) {
+    const headers = getAuthHeaders();
+    if (!headers) return [];
+
+    try {
+        const response = await fetch(`${API_BASE}/activities/activities`, { headers });
+        if (response.ok) {
+            const activities = await response.json();
+
+            // Calculer la plage de dates à afficher dans le calendrier
+            const firstDay = new Date(year, month, 1);
+            let startDayOfWeek = firstDay.getDay();
+            startDayOfWeek = startDayOfWeek === 0 ? 6 : startDayOfWeek - 1;
+
+            const calendarStartDate = new Date(firstDay);
+            calendarStartDate.setDate(firstDay.getDate() - startDayOfWeek);
+
+            const lastDay = new Date(year, month + 1, 0);
+            const calendarEndDate = new Date(lastDay);
+            calendarEndDate.setDate(calendarEndDate.getDate() + (7 - calendarEndDate.getDay()));
+
+            // Filtrer les activités dans la plage complète du calendrier affiché
+            return activities.filter(activity => {
+                const activityDate = new Date(activity.start_date);
+                return activityDate >= calendarStartDate && activityDate <= calendarEndDate;
+            });
+        }
+    } catch (error) {
+        console.error('Erreur chargement activités pour calendrier:', error);
+    }
+    return [];
 }
 
 // -----------------------------
@@ -2053,6 +2279,9 @@ document.addEventListener('DOMContentLoaded', function() {
     currentToken = localStorage.getItem('eyesight_token');
 
     if (currentToken && !isTokenExpired()) {
+        // Mettre à jour automatiquement les données en arrière-plan
+        autoUpdateData();
+
         showPage('dashboardPage');
         loadDashboard();
     } else if (currentToken) {
